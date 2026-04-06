@@ -1,0 +1,20 @@
+{
+  "name": "@repo/hooks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1 || ^19.0.0"
+  },
+  "dependencies": {},
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "typescript": "~5.7.2"
+  }
+}
