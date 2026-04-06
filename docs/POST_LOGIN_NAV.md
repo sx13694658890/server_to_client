@@ -8,8 +8,8 @@
 
 | 区域 | 说明 |
 |------|------|
-| **顶栏** | 左侧为侧栏折叠按钮；右侧为通知占位入口与当前用户区（头像首字母、邮箱来自 JWT 载荷解码展示，下拉可退出登录）。 |
-| **左侧导航（Sider）** | 分组菜单：文档、用户等；当前路由与菜单选中态联动。 |
+| **顶栏** | 左侧为侧栏折叠按钮；右侧为 **通知铃铛**（未读角标、`GET /messages` 抽屉列表、轮询未读数 + `GET /messages/stream` SSE，见 [message通知/前端实现方案.md](./message通知/前端实现方案.md)）与用户区（头像、邮箱、退出）。 |
+| **左侧导航（Sider）** | 扁平菜单项：首页、使用文档、个人中心、用户管理；折叠后仅图标。 |
 | **主内容区** | 浅灰背景上的白色卡片/表格，具体由子路由页面渲染（`Outlet`）。 |
 
 未登录用户访问 `/dashboard/*` 会被重定向到 `/login`（见 `apps/web/src/auth/require-auth.tsx`）。
@@ -58,6 +58,9 @@
 |------|------|
 | `apps/web/src/app.tsx` | 路由：`/`、`/login`、`/register`、受保护的 `/dashboard/*`。 |
 | `apps/web/src/layouts/dashboard-layout.tsx` | 顶栏 + 侧栏 + `Outlet`。 |
+| `apps/web/src/features/messages/dashboard-message-bell.tsx` | 顶栏通知：角标、抽屉、SSE + 轮询。 |
+| `packages/api/src/apis/messages.api.ts` | 站内通知 REST。 |
+| `packages/api/src/apis/messages-stream.api.ts` | `GET /messages/stream` SSE 解析。 |
 | `apps/web/src/pages/account-page.tsx` | 个人中心：修改密码表单。 |
 | `apps/web/src/pages/users-management-page.tsx` | 用户列表、分页与 **admin 删除**（二次确认）。 |
 | `packages/api/src/apis/users.api.ts` | `GET /users`、`DELETE /users/{id}`（`users.remove`）类型与封装。 |

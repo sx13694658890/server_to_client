@@ -1,5 +1,4 @@
 import {
-  BellOutlined,
   FileTextOutlined,
   HomeOutlined,
   IdcardOutlined,
@@ -12,6 +11,7 @@ import { App, Avatar, Dropdown, Layout, Menu, Space, Typography, theme } from 'a
 import { useAuth } from '@repo/hooks';
 import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { DashboardMessageBell } from '../features/messages';
 import { decodeJwtPayloadDisplay } from '../lib/jwt-payload';
 
 const { Header, Sider, Content } = Layout;
@@ -126,7 +126,7 @@ export function DashboardLayout() {
             </Typography.Text>
           </div>
           <Space size="middle" className="shrink-0">
-            <BellOutlined className="cursor-pointer text-lg text-neutral-500" />
+            <DashboardMessageBell />
             <Dropdown
               menu={{
                 items: [

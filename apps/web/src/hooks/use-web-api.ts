@@ -2,6 +2,7 @@ import {
   createAiApi,
   createAuthApi,
   createHttpBundle,
+  createMessagesApi,
   createSystemApi,
   createUsersApi,
 } from '@repo/api';
@@ -37,6 +38,7 @@ export function useWebApi() {
       system: createSystemApi(bundle.client),
       ai: createAiApi(bundle.client),
       users: createUsersApi(bundle.client),
+      messages: createMessagesApi(bundle.client),
     };
   }, [accessToken, clearAuth, navigate]);
 }

@@ -67,7 +67,8 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 | 文档 | 用途 |
 |------|------|
-| **[FRONTEND_API.md](./FRONTEND_API.md)** | **HTTP API 参考**（路径、请求/响应体、错误、AI SSE） |
+| **[FRONTEND_API.md](./FRONTEND_API.md)** | **HTTP API 参考**（路径、请求/响应体、错误、AI SSE、站内通知 SSE） |
+| [message通知/前端实现方案.md](./message通知/前端实现方案.md) | 站内消息通知前端对接与交互 |
 | [FRONTEND.md](./FRONTEND.md)（本文） | 对接总览、工程与安全、索引 |
 | [POST_LOGIN_NAV.md](./POST_LOGIN_NAV.md) | 登录后工作台布局与导航规划 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 后端工程、迁移与 API 文档约定 |

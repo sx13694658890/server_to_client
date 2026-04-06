@@ -24,3 +24,14 @@ export {
   type UsersListParams,
   type UsersListResponse,
 } from './apis/users.api';
+export {
+  createMessagesApi,
+  type MarkReadResponse,
+  type MessageItem,
+  type MessageListParams,
+  type MessageListResponse,
+  type MessagePriority,
+  type ReadAllResponse,
+  type UnreadCountResponse,
+} from './apis/messages.api';
+export { readMessagesStream, type MessageStreamHandlers } from './apis/messages-stream.api';
