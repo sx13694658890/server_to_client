@@ -1,37 +1,112 @@
-import { Card, Typography } from 'antd';
+import { CustomerServiceOutlined, ReloadOutlined } from '@ant-design/icons';
+import { App, Button, FloatButton, Input, Pagination, Typography } from 'antd';
 import { useDocumentTitle } from 'usehooks-ts';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  dispatchDocsListRefresh,
+  DocCardList,
+  DocsEmptyState,
+  DocsErrorState,
+  DocsListSkeleton,
+  DocsSidebar,
+  DocsWelcomeBanner,
+  findMenuLeaf,
+  useDocsList,
+} from '../features/docs';
 
-const DOC_LINKS = [
-  { title: 'HTTP API 参考（接口专篇）', path: 'docs/FRONTEND_API.md' },
-  { title: '前端对接总览（工程与安全）', path: 'docs/FRONTEND.md' },
-  { title: '登录后导航与规划', path: 'docs/POST_LOGIN_NAV.md' },
-  { title: '前端工程开发计划', path: 'docs/FRONTEND_DEV_PLAN.md' },
-];
+const PAGE_SIZE = 10;
 
-/** 仓库内 Markdown 说明索引（开发时在 IDE 中打开对应路径） */
 export function DashboardDocsPage() {
-  useDocumentTitle('使用文档 · client-react-sp');
+  useDocumentTitle('文档中心 · client-react-sp');
+  const { message } = App.useApp();
+  const [activeMenuKey, setActiveMenuKey] = useState('docs-all');
+  const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useState('');
+  const [searchDraft, setSearchDraft] = useState('');
+
+  const category = useMemo(() => findMenuLeaf(activeMenuKey)?.category, [activeMenuKey]);
+
+  const { list, total, loading, error, refreshing, reload } = useDocsList({
+    category,
+    keyword,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeMenuKey, keyword]);
+
+  const mainBlock = (() => {
+    if (loading && list.length === 0) {
+      return <DocsListSkeleton />;
+    }
+    if (error) {
+      return <DocsErrorState message={error} onRetry={reload} />;
+    }
+    if (list.length === 0) {
+      return <DocsEmptyState keyword={keyword} />;
+    }
+    return <DocCardList items={list} />;
+  })();
 
   return (
-    <div>
-      <Typography.Title level={4} className="!mb-6">
-        使用文档
-      </Typography.Title>
-      <Card>
-        <Typography.Paragraph type="secondary" className="!mb-4">
-          以下为仓库 <code>docs/</code> 目录中的说明文件，请在编辑器或版本库中打开查看完整内容。
-        </Typography.Paragraph>
-        <ul className="list-inside list-disc space-y-2 text-neutral-800">
-          {DOC_LINKS.map((d) => (
-            <li key={d.path}>
-              <Typography.Text strong>{d.title}</Typography.Text>
-              <Typography.Text type="secondary" className="ml-2 font-mono text-sm">
-                {d.path}
-              </Typography.Text>
-            </li>
-          ))}
-        </ul>
-      </Card>
+    <div className="relative pb-16">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 lg:flex-row lg:items-start">
+        <DocsSidebar activeKey={activeMenuKey} onSelectKey={setActiveMenuKey} />
+        <div className="min-w-0 flex-1 space-y-6">
+          <DocsWelcomeBanner />
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <Typography.Title level={4} className="!mb-0">
+              全部文档
+            </Typography.Title>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input.Search
+                allowClear
+                placeholder="搜索关键词"
+                value={searchDraft}
+                className="w-full sm:w-64"
+                onChange={(e) => setSearchDraft(e.target.value)}
+                onSearch={(v) => {
+                  setKeyword(v.trim());
+                  setPage(1);
+                }}
+              />
+              <Button
+                icon={<ReloadOutlined />}
+                loading={refreshing}
+                onClick={() => dispatchDocsListRefresh()}
+              >
+                刷新
+              </Button>
+            </div>
+          </div>
+
+          {mainBlock}
+
+          {!error && !loading && total > PAGE_SIZE ? (
+            <div className="flex justify-end pt-2">
+              <Pagination
+                current={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                showSizeChanger={false}
+                onChange={(p) => setPage(p)}
+                showTotal={(t) => `共 ${t} 条`}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <FloatButton
+        icon={<CustomerServiceOutlined />}
+        tooltip="客服与反馈"
+        type="primary"
+        className="!bottom-6 !right-6"
+        onClick={() => message.info('敬请期待')}
+      />
     </div>
   );
 }

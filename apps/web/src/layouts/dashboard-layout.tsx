@@ -1,9 +1,11 @@
 import {
+  BellOutlined,
   FileTextOutlined,
   HomeOutlined,
   IdcardOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
@@ -11,7 +13,7 @@ import { App, Avatar, Dropdown, Layout, Menu, Space, Typography, theme } from 'a
 import { useAuth } from '@repo/hooks';
 import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { DashboardMessageBell } from '../features/messages';
+import { DashboardMessageBell, MessageInboxProvider } from '../features/messages';
 import { decodeJwtPayloadDisplay } from '../lib/jwt-payload';
 
 const { Header, Sider, Content } = Layout;
@@ -36,6 +38,7 @@ export function DashboardLayout() {
     if (p.startsWith('/dashboard/users')) return ['/dashboard/users'];
     if (p.startsWith('/dashboard/account')) return ['/dashboard/account'];
     if (p.startsWith('/dashboard/docs')) return ['/dashboard/docs'];
+    if (p.startsWith('/dashboard/messages')) return ['/dashboard/messages'];
     return ['/dashboard/home'];
   }, [location.pathname]);
 
@@ -52,6 +55,11 @@ export function DashboardLayout() {
         label: <Link to="/dashboard/docs">使用文档</Link>,
       },
       {
+        key: '/dashboard/messages',
+        icon: <BellOutlined />,
+        label: <Link to="/dashboard/messages">通知中心</Link>,
+      },
+      {
         key: '/dashboard/account',
         icon: <IdcardOutlined />,
         label: <Link to="/dashboard/account">个人中心</Link>,
@@ -66,6 +74,7 @@ export function DashboardLayout() {
   );
 
   return (
+    <MessageInboxProvider>
     <Layout className="min-h-screen">
       <Sider
         trigger={null}
@@ -118,11 +127,13 @@ export function DashboardLayout() {
             <Typography.Text type="secondary" className="hidden truncate text-sm sm:inline">
               {location.pathname.startsWith('/dashboard/docs')
                 ? '文档中心'
-                : location.pathname.startsWith('/dashboard/users')
-                  ? '用户管理'
-                  : location.pathname.startsWith('/dashboard/account')
-                    ? '个人中心'
-                    : '工作台首页'}
+                : location.pathname.startsWith('/dashboard/messages')
+                  ? '通知中心'
+                  : location.pathname.startsWith('/dashboard/users')
+                    ? '用户管理'
+                    : location.pathname.startsWith('/dashboard/account')
+                      ? '个人中心'
+                      : '工作台首页'}
             </Typography.Text>
           </div>
           <Space size="middle" className="shrink-0">
@@ -130,6 +141,19 @@ export function DashboardLayout() {
             <Dropdown
               menu={{
                 items: [
+                  {
+                    key: 'account',
+                    label: <Link to="/dashboard/account">个人中心</Link>,
+                  },
+                  {
+                    key: 'settings',
+                    icon: <SettingOutlined />,
+                    label: '设置',
+                    onClick: () => message.info('敬请期待'),
+                  },
+                  {
+                    type: 'divider',
+                  },
                   {
                     key: 'logout',
                     label: '退出登录',
@@ -163,5 +187,6 @@ export function DashboardLayout() {
         </Content>
       </Layout>
     </Layout>
+    </MessageInboxProvider>
   );
 }

@@ -1,6 +1,7 @@
 import {
   createAiApi,
   createAuthApi,
+  createDocsApi,
   createHttpBundle,
   createMessagesApi,
   createSystemApi,
@@ -39,6 +40,7 @@ export function useWebApi() {
       ai: createAiApi(bundle.client),
       users: createUsersApi(bundle.client),
       messages: createMessagesApi(bundle.client),
+      docs: createDocsApi(bundle.client),
     };
   }, [accessToken, clearAuth, navigate]);
 }

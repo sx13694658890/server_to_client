@@ -34,4 +34,11 @@ export {
   type ReadAllResponse,
   type UnreadCountResponse,
 } from './apis/messages.api';
+export {
+  createDocsApi,
+  type DocDetail,
+  type DocListItem,
+  type DocListParams,
+  type DocListResponse,
+} from './apis/docs.api';
 export { readMessagesStream, type MessageStreamHandlers } from './apis/messages-stream.api';
