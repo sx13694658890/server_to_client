@@ -36,6 +36,7 @@ export {
 } from './apis/messages.api';
 export {
   createDocsApi,
+  resolveDocsContentRequestRef,
   type DocDetail,
   type DocListItem,
   type DocListParams,

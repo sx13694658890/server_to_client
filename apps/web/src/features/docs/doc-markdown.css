@@ -1,0 +1,108 @@
+/* 文档正文 Markdown（无 @tailwindcss/typography 时的轻量样式） */
+.doc-md {
+  line-height: 1.65;
+  color: rgb(38 38 38);
+}
+
+.doc-md h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem;
+}
+
+.doc-md h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.doc-md h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+
+.doc-md p {
+  margin: 0 0 0.75rem;
+}
+
+.doc-md ul,
+.doc-md ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.doc-md ul {
+  list-style-type: disc;
+}
+
+.doc-md ol {
+  list-style-type: decimal;
+}
+
+.doc-md li {
+  margin-bottom: 0.25rem;
+}
+
+.doc-md a {
+  color: rgb(5 150 105);
+  text-decoration: underline;
+}
+
+.doc-md a:hover {
+  color: rgb(4 120 87);
+}
+
+.doc-md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+  background: rgb(245 245 245);
+  padding: 0.15em 0.35em;
+  border-radius: 0.25rem;
+}
+
+.doc-md pre {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  background: rgb(245 245 245);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+}
+
+.doc-md pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.doc-md blockquote {
+  margin: 0 0 0.75rem;
+  padding-left: 1rem;
+  border-left: 3px solid rgb(212 212 212);
+  color: rgb(82 82 82);
+}
+
+.doc-md hr {
+  margin: 1.25rem 0;
+  border: 0;
+  border-top: 1px solid rgb(229 229 229);
+}
+
+.doc-md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+}
+
+.doc-md th,
+.doc-md td {
+  border: 1px solid rgb(229 229 229);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.doc-md th {
+  background: rgb(250 250 250);
+  font-weight: 600;
+}

@@ -4,7 +4,7 @@ import { getApiErrorMessage, type DocDetail } from '@repo/api';
 import { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from 'usehooks-ts';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { DocsErrorState, DocsSidebar } from '../features/docs';
+import { DocMarkdown, DocsErrorState, DocsSidebar } from '../features/docs';
 import { useWebApi } from '../hooks/use-web-api';
 
 export function DashboardDocDetailPage() {
@@ -14,6 +14,7 @@ export function DashboardDocDetailPage() {
   const { message } = App.useApp();
 
   const [doc, setDoc] = useState<DocDetail | null>(null);
+  const [markdownFromFile, setMarkdownFromFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,9 +26,20 @@ export function DashboardDocDetailPage() {
     }
     setLoading(true);
     setError(null);
+    setMarkdownFromFile(null);
     try {
       const { data } = await api.docs.detail(docId);
       setDoc(data);
+
+      if (data.can_view === true && data.content_url?.trim()) {
+        try {
+          const res = await api.docs.content(data.content_url.trim());
+          const text = typeof res.data === 'string' ? res.data : String(res.data ?? '');
+          setMarkdownFromFile(text);
+        } catch {
+          setMarkdownFromFile(null);
+        }
+      }
     } catch (e) {
       setError(getApiErrorMessage(e));
       setDoc(null);
@@ -43,11 +55,15 @@ export function DashboardDocDetailPage() {
   const title = doc?.title?.trim() || '文档详情';
   useDocumentTitle(`${title} · 文档中心`);
 
-  const bodyText = doc?.content ?? doc?.body ?? '';
+  const fallbackBody = (doc?.content ?? doc?.body ?? '').trim();
+  const displayMarkdown =
+    (markdownFromFile != null && markdownFromFile.trim() !== ''
+      ? markdownFromFile
+      : fallbackBody) || '';
 
   return (
     <div className="relative pb-16">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 min-[1200px]:flex-row min-[1200px]:items-start">
         <DocsSidebar
           activeKey="docs-all"
           detailMode
@@ -88,13 +104,18 @@ export function DashboardDocDetailPage() {
                   {doc.summary.trim()}
                 </Typography.Paragraph>
               ) : null}
-              {bodyText ? (
-                <div className="prose prose-neutral mt-6 max-w-none whitespace-pre-wrap text-neutral-800">
-                  {bodyText}
+              {doc.docs_relpath?.trim() ? (
+                <Typography.Text type="secondary" className="block font-mono text-xs">
+                  {doc.docs_relpath.trim()}
+                </Typography.Text>
+              ) : null}
+              {displayMarkdown ? (
+                <div className="mt-6 max-w-none text-neutral-800">
+                  <DocMarkdown source={displayMarkdown} />
                 </div>
               ) : (
                 <Typography.Paragraph type="secondary" className="!mb-0 mt-6">
-                  暂无正文内容（后端可返回 content / body 字段）。
+                  暂无正文（后端可提供 content_url 或详情中的 body/content）。
                 </Typography.Paragraph>
               )}
             </article>

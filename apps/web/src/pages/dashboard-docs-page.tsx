@@ -52,7 +52,7 @@ export function DashboardDocsPage() {
 
   return (
     <div className="relative pb-16">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 min-[1200px]:flex-row min-[1200px]:items-start">
         <DocsSidebar activeKey={activeMenuKey} onSelectKey={setActiveMenuKey} />
         <div className="min-w-0 flex-1 space-y-6">
           <DocsWelcomeBanner />
