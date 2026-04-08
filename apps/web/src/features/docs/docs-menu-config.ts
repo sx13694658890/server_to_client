@@ -11,36 +11,38 @@ export type DocsMenuGroup = {
   items: DocsMenuLeaf[];
 };
 
-/** 左侧分组导航；与需求文档示例一致，可按产品配置调整 */
-export const DOCS_MENU_GROUPS: DocsMenuGroup[] = [
-  {
-    title: '使用文档',
-    items: [{ key: 'docs-all', label: '全部文档' }],
-  },
-  {
-    title: '回访',
-    items: [
-      { key: 'visit-overview', label: '回访概览', category: '回访' },
-      { key: 'visit-guide', label: '操作指南', category: '回访指南' },
-    ],
-  },
-  {
-    title: '财务',
-    items: [{ key: 'finance', label: '财务说明', category: '财务' }],
-  },
-  {
-    title: '用户',
-    items: [
-      { key: 'user-manual', label: '用户手册', category: '用户', badge: 'New' },
-      { key: 'user-role', label: '角色权限', category: '角色权限' },
-    ],
-  },
-];
+/** 与侧栏「全部」项 key 一致 */
+export const DOCS_ALL_MENU_KEY = 'docs-all';
 
-export function findMenuLeaf(key: string): DocsMenuLeaf | undefined {
-  for (const g of DOCS_MENU_GROUPS) {
-    const hit = g.items.find((i) => i.key === key);
-    if (hit) return hit;
+const CATEGORY_KEY_PREFIX = 'cat:';
+
+/** 由后端 category 生成稳定菜单 key（避免特殊字符干扰） */
+export function categoryMenuKey(category: string): string {
+  return `${CATEGORY_KEY_PREFIX}${encodeURIComponent(category)}`;
+}
+
+/**
+ * 当前列表请求应使用的 category：未选或「全部」为 undefined。
+ */
+export function listCategoryFromMenuKey(menuKey: string): string | undefined {
+  if (menuKey === DOCS_ALL_MENU_KEY) return undefined;
+  if (!menuKey.startsWith(CATEGORY_KEY_PREFIX)) return undefined;
+  try {
+    return decodeURIComponent(menuKey.slice(CATEGORY_KEY_PREFIX.length));
+  } catch {
+    return undefined;
   }
-  return undefined;
+}
+
+/** 根据接口返回的分类名构建侧栏分组（与数据库 category 一致） */
+export function buildDocsMenuGroups(categories: string[]): DocsMenuGroup[] {
+  const items: DocsMenuLeaf[] = [
+    { key: DOCS_ALL_MENU_KEY, label: '全部文档' },
+    ...categories.map((c) => ({
+      key: categoryMenuKey(c),
+      label: c,
+      category: c,
+    })),
+  ];
+  return [{ title: '文档分类', items }];
 }

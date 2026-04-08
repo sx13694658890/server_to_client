@@ -1,5 +1,5 @@
 /**
- * FastAPI / Pydantic 风格错误体中的 `detail` 字段（见 docs/FRONTEND_API.md §6）。
+ * FastAPI / Pydantic 风格错误体中的 `detail` 字段（见 docs/FRONTEND_API.md §4）。
  */
 export type FastApiDetailItem = {
   type?: string;

@@ -37,9 +37,11 @@ export {
 export {
   createDocsApi,
   resolveDocsContentRequestRef,
+  type DocContentSource,
   type DocDetail,
   type DocListItem,
   type DocListParams,
   type DocListResponse,
+  type DocUploadResult,
 } from './apis/docs.api';
 export { readMessagesStream, type MessageStreamHandlers } from './apis/messages-stream.api';

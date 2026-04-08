@@ -14,7 +14,7 @@ export type StreamHandlers = {
 };
 
 /**
- * POST /api/v1/ai/chat/stream（SSE），按 docs/FRONTEND_API.md §8.3 解析。
+ * POST /api/v1/ai/chat/stream（SSE），按 docs/FRONTEND_API.md §5 解析。
  */
 export async function postAiChatStream(
   bundle: HttpBundle,

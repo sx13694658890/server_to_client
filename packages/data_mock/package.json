@@ -1,0 +1,10 @@
+{
+  "name": "@repo/data-mock",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./shenyang.json": "./shenyang.json",
+    "./agri-demo.json": "./agri-demo.json"
+  }
+}

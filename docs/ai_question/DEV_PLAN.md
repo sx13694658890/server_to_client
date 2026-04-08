@@ -129,7 +129,7 @@ apps/web/src/
 |------|------|
 | [REQUIREMENTS.md](./REQUIREMENTS.md) | 需求说明与验收 |
 | [DEV_PLAN.md](./DEV_PLAN.md) | 本文：开发计划 |
-| [../FRONTEND_DEV_PLAN.md](../FRONTEND_DEV_PLAN.md) | 全仓前端工程约定 |
+| [../FRONTEND.md](../FRONTEND.md)（§5–§7） | 全仓前端工程结构与阶段规划 |
 | [../FRONTEND_API.md](../FRONTEND_API.md) | HTTP API 参考 |
 | [../FRONTEND.md](../FRONTEND.md) | 对接总览与工程说明 |
 

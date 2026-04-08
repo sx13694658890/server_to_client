@@ -62,7 +62,7 @@ export function DashboardHomePage() {
         </Card>
         <Card title="连通性">
           <Typography.Paragraph type="secondary" className="!mb-3">
-            调用 <code>GET /api/v1/ping</code>（需本地后端与代理，见 docs/FRONTEND_API.md §7）。
+            调用 <code>GET /api/v1/ping</code>（需本地后端与代理，见 docs/FRONTEND_API.md §2）。
           </Typography.Paragraph>
           <Space wrap>
             <Button type="primary" loading={loading} onClick={callPing}>

@@ -21,7 +21,7 @@
 | 菜单 | 路由 | 说明 |
 |------|------|------|
 | **首页** | `/dashboard/home` | 工作台首页：环境变量与 **Ping** 连通性调试；右下角保留 **AI 聊天** 浮层（与访客首页能力一致，需登录态时带 Token 调后端）。 |
-| **文档 → 使用文档** | `/dashboard/docs` | 仓库内 `docs/` 文档索引（路径提示，便于在 IDE 中打开）；HTTP 契约见 [FRONTEND_API.md](./FRONTEND_API.md)。 |
+| **文档 → 使用文档** | `/dashboard/docs` | 文档中心（列表/详情、`content_url` 拉 Markdown）；实现要点 [文档需求/FRONTEND_IMPL.md](./文档需求/FRONTEND_IMPL.md)，接口 [FRONTEND_API.md](./FRONTEND_API.md) §2。 |
 | **通知中心** | `/dashboard/messages` | 站内通知全列表（未读/已读 Tab）；顶栏铃铛为 Popover 快捷预览，见 [message通知/前端实现方案.md](./message通知/前端实现方案.md)。 |
 | **用户 → 个人中心** | `/dashboard/account` | 修改登录密码：`POST /auth/change-password`（Bearer），见 [FRONTEND_API.md](./FRONTEND_API.md) §2.1。 |
 | **用户 → 用户管理** | `/dashboard/users` | `GET /users` 分页列表与 `current_user`；**`admin`** 可对非本人执行 **`DELETE /users/{user_id}`**（`users.remove`）。见 [FRONTEND_API.md](./FRONTEND_API.md) §2 路由一览。 |

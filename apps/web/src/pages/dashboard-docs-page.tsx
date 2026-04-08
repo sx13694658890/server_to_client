@@ -1,30 +1,45 @@
-import { CustomerServiceOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CloudUploadOutlined, CustomerServiceOutlined, ReloadOutlined } from '@ant-design/icons';
 import { App, Button, FloatButton, Input, Pagination, Typography } from 'antd';
 import { useDocumentTitle } from 'usehooks-ts';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  buildDocsMenuGroups,
   dispatchDocsListRefresh,
   DocCardList,
+  DocUploadModal,
   DocsEmptyState,
   DocsErrorState,
   DocsListSkeleton,
   DocsSidebar,
   DocsWelcomeBanner,
-  findMenuLeaf,
+  DOCS_ALL_MENU_KEY,
+  listCategoryFromMenuKey,
+  useDocsCategories,
   useDocsList,
 } from '../features/docs';
+import { useIsAdmin } from '../hooks/use-is-admin';
 
 const PAGE_SIZE = 10;
 
 export function DashboardDocsPage() {
   useDocumentTitle('文档中心 · client-react-sp');
   const { message } = App.useApp();
-  const [activeMenuKey, setActiveMenuKey] = useState('docs-all');
+  const isAdmin = useIsAdmin();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [activeMenuKey, setActiveMenuKey] = useState(DOCS_ALL_MENU_KEY);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
   const [searchDraft, setSearchDraft] = useState('');
 
-  const category = useMemo(() => findMenuLeaf(activeMenuKey)?.category, [activeMenuKey]);
+  const { categories } = useDocsCategories();
+  const menuGroups = useMemo(() => buildDocsMenuGroups(categories), [categories]);
+
+  useEffect(() => {
+    const keys = new Set(menuGroups.flatMap((g) => g.items.map((i) => i.key)));
+    if (!keys.has(activeMenuKey)) setActiveMenuKey(DOCS_ALL_MENU_KEY);
+  }, [menuGroups, activeMenuKey]);
+
+  const category = useMemo(() => listCategoryFromMenuKey(activeMenuKey), [activeMenuKey]);
 
   const { list, total, loading, error, refreshing, reload } = useDocsList({
     category,
@@ -47,13 +62,17 @@ export function DashboardDocsPage() {
     if (list.length === 0) {
       return <DocsEmptyState keyword={keyword} />;
     }
-    return <DocCardList items={list} />;
+    return <DocCardList items={list} onDocDeleted={() => dispatchDocsListRefresh()} />;
   })();
 
   return (
     <div className="relative pb-16">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 min-[1200px]:flex-row min-[1200px]:items-start">
-        <DocsSidebar activeKey={activeMenuKey} onSelectKey={setActiveMenuKey} />
+        <DocsSidebar
+          menuGroups={menuGroups}
+          activeKey={activeMenuKey}
+          onSelectKey={setActiveMenuKey}
+        />
         <div className="min-w-0 flex-1 space-y-6">
           <DocsWelcomeBanner />
 
@@ -62,6 +81,11 @@ export function DashboardDocsPage() {
               全部文档
             </Typography.Title>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {isAdmin ? (
+                <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setUploadOpen(true)}>
+                  上传文档
+                </Button>
+              ) : null}
               <Input.Search
                 allowClear
                 placeholder="搜索关键词"
@@ -106,6 +130,12 @@ export function DashboardDocsPage() {
         type="primary"
         className="!bottom-6 !right-6"
         onClick={() => message.info('敬请期待')}
+      />
+
+      <DocUploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onSuccess={() => dispatchDocsListRefresh()}
       />
     </div>
   );

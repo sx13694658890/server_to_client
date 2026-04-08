@@ -39,6 +39,10 @@ export function createHttpBundle(options: CreateHttpBundleOptions): HttpBundle {
   });
 
   client.interceptors.request.use((config) => {
+    // FormData 必须由浏览器自动带 multipart boundary；勿沿用默认 application/json
+    if (config.data instanceof FormData) {
+      config.headers.delete('Content-Type');
+    }
     if (!config.skipAuth) {
       const token = options.getToken();
       if (token) {
@@ -54,11 +58,8 @@ export function createHttpBundle(options: CreateHttpBundleOptions): HttpBundle {
       if (axios.isAxiosError(err)) {
         const s = err.response?.status;
         const cfg = err.config;
-        if (
-          (s === 401 || s === 403) &&
-          cfg &&
-          !cfg.skipUnauthorizedRedirect
-        ) {
+        // 仅 401 表示未认证；403 多为权限不足（如非 admin 上传），不应清会话
+        if (s === 401 && cfg && !cfg.skipUnauthorizedRedirect) {
           options.onUnauthorized?.();
         }
       }

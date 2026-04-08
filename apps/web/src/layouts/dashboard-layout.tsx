@@ -1,6 +1,7 @@
 import {
   BellOutlined,
   FileTextOutlined,
+  GlobalOutlined,
   HomeOutlined,
   IdcardOutlined,
   MenuFoldOutlined,
@@ -38,6 +39,7 @@ export function DashboardLayout() {
     if (p.startsWith('/dashboard/users')) return ['/dashboard/users'];
     if (p.startsWith('/dashboard/account')) return ['/dashboard/account'];
     if (p.startsWith('/dashboard/docs')) return ['/dashboard/docs'];
+    if (p.startsWith('/dashboard/agri')) return ['/dashboard/agri'];
     if (p.startsWith('/dashboard/messages')) return ['/dashboard/messages'];
     return ['/dashboard/home'];
   }, [location.pathname]);
@@ -53,6 +55,11 @@ export function DashboardLayout() {
         key: '/dashboard/docs',
         icon: <FileTextOutlined />,
         label: <Link to="/dashboard/docs">使用文档</Link>,
+      },
+      {
+        key: '/dashboard/agri',
+        icon: <GlobalOutlined />,
+        label: <Link to="/dashboard/agri">农业遥感</Link>,
       },
       {
         key: '/dashboard/messages',
@@ -127,6 +134,8 @@ export function DashboardLayout() {
             <Typography.Text type="secondary" className="hidden truncate text-sm sm:inline">
               {location.pathname.startsWith('/dashboard/docs')
                 ? '文档中心'
+                : location.pathname.startsWith('/dashboard/agri')
+                  ? '农业遥感'
                 : location.pathname.startsWith('/dashboard/messages')
                   ? '通知中心'
                   : location.pathname.startsWith('/dashboard/users')

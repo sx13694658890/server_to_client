@@ -5,7 +5,7 @@ const chatSourceSchema = z.object({
   path: z.string(),
 });
 
-/** SSE: data: { ... } JSON，与 docs/FRONTEND_API.md §8.3 对齐 */
+/** SSE: data: { ... } JSON，与 docs/FRONTEND_API.md §5 对齐 */
 export const sseEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('meta'),

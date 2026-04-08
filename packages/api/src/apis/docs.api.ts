@@ -1,5 +1,7 @@
 import type { AxiosInstance } from 'axios';
 
+export type DocContentSource = 'repo' | 'upload' | 'inline';
+
 export type DocListItem = {
   id: string;
   title: string;
@@ -9,8 +11,12 @@ export type DocListItem = {
   tags?: string[];
   /** 缺省或 false 时前端按无权限处理 */
   can_view?: boolean;
+  /** 创建/上传时间 */
   created_at?: string;
   updated_at?: string;
+  content_source?: DocContentSource;
+  /** admin 时可展示删除 */
+  can_delete?: boolean;
   /** 有权限时由后端给出，用于拉取 Markdown 正文 */
   content_url?: string;
   /** 相对服务端仓库 docs/ 的路径（展示用） */
@@ -34,6 +40,15 @@ export type DocDetail = DocListItem & {
   /** 详情 JSON 内摘要性正文（可选） */
   content?: string;
   body?: string;
+};
+
+export type DocUploadResult = {
+  id: string;
+  title: string;
+  summary: string;
+  category?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 /**
@@ -61,10 +76,24 @@ export function createDocsApi(client: AxiosInstance) {
     detail(docId: string) {
       return client.get<DocDetail>(`/docs/${encodeURIComponent(docId)}`);
     },
-    /** 拉取 Markdown 原文，需带 Bearer（走同一 axios 实例） */
+    /** 拉取 Markdown 原文（相对 content_url），需带 Bearer */
     content(contentUrl: string) {
       const ref = resolveDocsContentRequestRef(contentUrl);
       return client.get<string>(ref, { responseType: 'text' });
+    },
+    /** `GET /docs/{id}/content` 纯 Markdown */
+    contentById(docId: string) {
+      return client.get<string>(`/docs/${encodeURIComponent(docId)}/content`, {
+        responseType: 'text',
+      });
+    },
+    /** multipart/form-data，仅 admin */
+    upload(formData: FormData) {
+      return client.post<DocUploadResult>('/docs/upload', formData);
+    },
+    /** 仅 admin，成功 204 */
+    remove(docId: string) {
+      return client.delete<void>(`/docs/${encodeURIComponent(docId)}`);
     },
   };
 }

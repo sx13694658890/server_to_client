@@ -3,25 +3,26 @@ import { Button, Drawer, Menu, Tag } from 'antd';
 import type { MenuProps } from 'antd';
 import { useMemo, useState } from 'react';
 import { useMediaQuery } from 'usehooks-ts';
-import { DOCS_MENU_GROUPS } from './docs-menu-config';
+import { DOCS_ALL_MENU_KEY, type DocsMenuGroup } from './docs-menu-config';
 
 const DOC_NAV_MIN_WIDTH = 1200;
 
 type Props = {
+  menuGroups: DocsMenuGroup[];
   activeKey: string;
   onSelectKey: (key: string) => void;
   /** 文档详情页时仍高亮「使用文档」侧栏语境 */
   detailMode?: boolean;
 };
 
-export function DocsSidebar({ activeKey, onSelectKey, detailMode }: Props) {
+export function DocsSidebar({ menuGroups, activeKey, onSelectKey, detailMode }: Props) {
   const desktopNav = useMediaQuery(`(min-width: ${DOC_NAV_MIN_WIDTH}px)`);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const selectedKeys = detailMode ? ['docs-all'] : [activeKey];
+  const selectedKeys = detailMode ? [DOCS_ALL_MENU_KEY] : [activeKey];
 
   const items: MenuProps['items'] = useMemo(
     () =>
-      DOCS_MENU_GROUPS.map((g) => ({
+      menuGroups.map((g) => ({
         type: 'group' as const,
         label: <span className="text-xs font-medium text-neutral-500">{g.title}</span>,
         children: g.items.map((item) => ({
@@ -38,7 +39,7 @@ export function DocsSidebar({ activeKey, onSelectKey, detailMode }: Props) {
           ),
         })),
       })),
-    []
+    [menuGroups]
   );
 
   const handleMenuClick = (key: string) => {

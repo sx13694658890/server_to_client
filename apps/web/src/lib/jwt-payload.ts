@@ -1,4 +1,4 @@
-/** 仅用于展示；不校验签名，与 docs/FRONTEND_API.md §5 一致。 */
+/** 仅用于展示；不校验签名，与 docs/FRONTEND_API.md §3 一致。 */
 export type JwtPayloadDisplay = {
   sub?: string;
   email?: string;
