@@ -104,7 +104,7 @@ export function DashboardLayout() {
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-neutral-900">Client React</div>
+              <div className="truncate text-sm font-semibold text-neutral-900">Galaxy Challenger</div>
               <div className="truncate text-xs text-neutral-500">工作台</div>
             </div>
           )}

@@ -4,12 +4,12 @@ import { useAuth } from '@repo/hooks';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDocumentTitle } from 'usehooks-ts';
-import { useWebApi } from '../hooks/use-web-api';
-import { zodErrorToFormFieldData } from '../lib/zod-antd';
+import { useWebApi } from '../../hooks/use-web-api';
+import { zodErrorToFormFieldData } from '../../lib/zod-antd';
 import {
   changePasswordFormSchema,
   type ChangePasswordFormValues,
-} from '../schemas/account';
+} from '../../schemas/account';
 
 export function AccountPage() {
   useDocumentTitle('账户信息 · client-react-sp');

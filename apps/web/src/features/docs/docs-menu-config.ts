@@ -1,3 +1,5 @@
+import type { DocListItem } from '@repo/api';
+
 export type DocsMenuLeaf = {
   key: string;
   label: string;
@@ -34,6 +36,33 @@ export function listCategoryFromMenuKey(menuKey: string): string | undefined {
   }
 }
 
+function normalizeListCategory(raw: DocListItem['category']): string | null {
+  if (raw == null) return null;
+  const c = typeof raw === 'string' ? raw.trim() : String(raw).trim();
+  return c.length ? c : null;
+}
+
+/**
+ * 从 `GET /docs` 列表项里的 `category` 字段聚合去重（与接口、列表筛选一致）。
+ */
+export function mergeCategoriesFromDocItems(
+  into: Set<string>,
+  items: Pick<DocListItem, 'category'>[]
+): void {
+  for (const it of items) {
+    const c = normalizeListCategory(it.category);
+    if (c) into.add(c);
+  }
+}
+
+export function collectCategoriesFromDocItems(
+  items: Pick<DocListItem, 'category'>[]
+): string[] {
+  const seen = new Set<string>();
+  mergeCategoriesFromDocItems(seen, items);
+  return [...seen].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+}
+
 /** 根据接口返回的分类名构建侧栏分组（与数据库 category 一致） */
 export function buildDocsMenuGroups(categories: string[]): DocsMenuGroup[] {
   const items: DocsMenuLeaf[] = [
@@ -45,4 +74,11 @@ export function buildDocsMenuGroups(categories: string[]): DocsMenuGroup[] {
     })),
   ];
   return [{ title: '文档分类', items }];
+}
+
+/** 直接从列表响应 `items` 生成侧栏（内部先按 `category` 聚合） */
+export function buildDocsMenuGroupsFromListItems(
+  items: Pick<DocListItem, 'category'>[]
+): DocsMenuGroup[] {
+  return buildDocsMenuGroups(collectCategoriesFromDocItems(items));
 }

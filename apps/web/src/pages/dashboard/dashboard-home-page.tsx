@@ -1,30 +1,20 @@
 import { Button, Card, Space, Typography } from 'antd';
-import { useAuth } from '@repo/hooks';
-import { AppShell } from '@repo/ui';
 import { getApiBaseUrl } from '@repo/utils';
 import { useDocumentTitle, useToggle } from 'usehooks-ts';
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
 import { getApiErrorMessage } from '@repo/api';
-import { API_V1_PREFIX } from '../constants';
-import { AiChatWidget } from '../features/ai-chat';
-import { useWebApi } from '../hooks/use-web-api';
+import { API_V1_PREFIX } from '../../constants';
+import { AiChatWidget } from '../../features/ai-chat';
+import { useWebApi } from '../../hooks/use-web-api';
 
-const HOME_BANNER_URL = '/images/banner.jpg';
+/** 登录后工作台首页：环境与连通性调试 + AI 助手 */
+export function DashboardHomePage() {
+  useDocumentTitle('工作台 · client-react-sp');
 
-/** 未登录访客首页；已登录用户进入工作台 */
-export function LandingPage() {
-  useDocumentTitle('首页 · client-react-sp');
-
-  const { accessToken } = useAuth();
   const api = useWebApi();
   const [pingText, setPingText] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [showEnvCard, toggleShowEnvCard] = useToggle(true);
-
-  if (accessToken) {
-    return <Navigate to="/dashboard/home" replace />;
-  }
 
   const apiBaseLabel = getApiBaseUrl(import.meta.env) || '（相对路径，经 Vite 代理 /api）';
 
@@ -43,34 +33,11 @@ export function LandingPage() {
   }
 
   return (
-    <AppShell
-      title="client-react-sp"
-      contentClassName="relative min-h-[calc(100dvh-64px)] !bg-transparent"
-      headerExtra={
-        <Space>
-          <Link to="/login">
-            <Button size="small" type="primary">
-              登录
-            </Button>
-          </Link>
-          <Link to="/register">
-            <Button size="small">注册</Button>
-          </Link>
-        </Space>
-      }
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-      >
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${HOME_BANNER_URL})` }}
-        />
-        <div className="absolute inset-0 bg-black/40" />
-      </div>
-
-      <Space direction="vertical" size="large" className="relative z-10 w-full max-w-xl">
+    <div className="relative min-h-[calc(100dvh-56px-48px)]">
+      <Typography.Title level={4} className="!mb-6">
+        工作台
+      </Typography.Title>
+      <Space direction="vertical" size="large" className="w-full max-w-2xl">
         <Card
           title="环境"
           extra={
@@ -109,6 +76,6 @@ export function LandingPage() {
       </Space>
 
       <AiChatWidget />
-    </AppShell>
+    </div>
   );
 }

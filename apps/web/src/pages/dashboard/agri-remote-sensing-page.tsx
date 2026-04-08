@@ -1,13 +1,18 @@
 import { InfoCircleOutlined, GlobalOutlined } from '@ant-design/icons';
-import { Alert, Card, List, Space, Switch, Table, Tag, Typography } from 'antd';
+import { App, Alert, Card, List, Space, Switch, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { FeatureCollection } from 'geojson';
 import agriDemo from '@repo/data-mock/agri-demo.json';
 import shenyangBoundary from '@repo/data-mock/shenyang.json';
 import { useDocumentTitle } from 'usehooks-ts';
 import { useCallback, useMemo, useState } from 'react';
-import { AgriMapView, AgriTimeseriesChart } from '../features/agri-rs';
-import type { AgriDemoData, NdviPoint } from '../features/agri-rs';
+import {
+  AgriMapView,
+  AgriTimeseriesChart,
+  getAgriMapRasterConfig,
+  hasAgriRasterLayers,
+} from '../../features/agri-rs';
+import type { AgriDemoData, NdviPoint } from '../../features/agri-rs';
 
 const demo = agriDemo as AgriDemoData;
 const boundary = shenyangBoundary as FeatureCollection;
@@ -22,7 +27,7 @@ type ParcelRow = {
 
 export function AgriRemoteSensingPage() {
   useDocumentTitle('农业遥感 · client-react-sp');
-
+  const { message } = App.useApp();
   const parcelRows: ParcelRow[] = useMemo(
     () =>
       demo.parcels.features.map((f) => {
@@ -44,6 +49,16 @@ export function AgriRemoteSensingPage() {
   const series: NdviPoint[] = selectedId ? (demo.timeseries[selectedId] ?? []) : [];
 
   const onSelectParcel = useCallback((id: string) => setSelectedId(id), []);
+
+  const rasterConfig = useMemo(() => getAgriMapRasterConfig(), []);
+  const rasterActive = hasAgriRasterLayers(rasterConfig);
+
+  const onTitilerError = useCallback(
+    (msg: string) => {
+      message.warning(msg);
+    },
+    [message]
+  );
 
   const columns: ColumnsType<ParcelRow> = [
     { title: '地块', dataIndex: 'name', key: 'name', ellipsis: true },
@@ -77,8 +92,12 @@ export function AgriRemoteSensingPage() {
           </Typography.Text>
         </div>
         <Space align="center" className="text-sm text-neutral-600">
-          <span className="hidden sm:inline">栅格 NDVI 图层</span>
-          <Switch disabled checked={false} aria-label="栅格图层占位，待后端瓦片" />
+          <span className="hidden sm:inline">高程/底图 XYZ</span>
+          <Switch
+            disabled
+            checked={rasterActive}
+            aria-label={rasterActive ? '已通过环境变量配置 XYZ' : '未配置，见 .env.development 说明'}
+          />
         </Space>
       </div>
 
@@ -89,6 +108,34 @@ export function AgriRemoteSensingPage() {
         message={demo.meta.dataDisclaimer}
         className="text-sm"
       />
+
+      {import.meta.env.DEV && !rasterConfig.titiler ? (
+        <Alert
+          type="info"
+          showIcon
+          className="text-sm"
+          message="可选：未配置 TiTiler 指数栅格"
+          description={
+            <>
+              当前地图与地块演示可正常使用；未设置 COG / TileJSON 时不会请求 TiTiler，并非报错。
+              若要叠加动态栅格，请按{' '}
+              <Typography.Text code className="text-xs">
+                docs/agri-remote-sensing/前端对接指南.md
+              </Typography.Text>{' '}
+              配置 <code className="rounded bg-neutral-100 px-1">apps/web/.env.development</code> 中的{' '}
+              <code className="rounded bg-neutral-100 px-1">VITE_TITILER_BASE_URL</code> 与{' '}
+              <code className="rounded bg-neutral-100 px-1">VITE_AGRI_TITILER_COG_URL</code>（或完整 https 的{' '}
+              <code className="rounded bg-neutral-100 px-1">VITE_AGRI_TITILER_TILEJSON_PATH</code>
+              ）；路径为 <code className="rounded bg-neutral-100 px-1">/WebMercatorQuad/tilejson.json</code>，无{' '}
+              <code className="rounded bg-neutral-100 px-1">/cog</code> 前缀。修改后<strong>重启</strong>{' '}
+              <code className="rounded bg-neutral-100 px-1">pnpm dev</code>。MapLibre 补充见{' '}
+              <Typography.Text code className="text-xs">
+                TITILER_FRONTEND.md
+              </Typography.Text>。
+            </>
+          }
+        />
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(260px,320px)_1fr]">
         <Card size="small" title="监测地块" className="shadow-sm">
@@ -112,6 +159,8 @@ export function AgriRemoteSensingPage() {
             parcels={demo.parcels}
             selectedParcelId={selectedId}
             onSelectParcel={onSelectParcel}
+            rasterConfig={rasterConfig}
+            onTitilerError={rasterConfig.titiler ? onTitilerError : undefined}
           />
           <div className="mt-3 border-t border-neutral-100 pt-3">
             <Typography.Text type="secondary" className="mb-2 block text-xs">
@@ -124,8 +173,51 @@ export function AgriRemoteSensingPage() {
               <LegendStop color="#1a9850" label="&gt;0.70" />
             </div>
             <Typography.Paragraph type="secondary" className="!mb-0 !mt-2 text-xs">
-              灰色底图来自 MapLibre 演示样式；行政区界数据为{' '}
-              <code className="rounded bg-neutral-100 px-1">packages/data_mock/shenyang.json</code>。
+              {(() => {
+                const hasBasemap = Boolean(
+                  rasterConfig.basemapRasterTileUrls?.length || rasterConfig.basemapRasterTiles
+                );
+                const gaodeBasemap = rasterConfig.basemapRasterTileUrls?.some((u) =>
+                  u.includes('is.autonavi.com')
+                );
+                const dem = rasterConfig.demTilesTemplate
+                  ? `高程晕渲（${rasterConfig.demEncoding}）${
+                      rasterConfig.terrainExaggeration
+                        ? ` · 三维 ×${rasterConfig.terrainExaggeration}`
+                        : ''
+                    }。`
+                  : '';
+                const titilerHint = rasterConfig.titiler
+                  ? ' TiTiler：TileJSON → raster 叠在地块之下；默认 COG 为公网样例（非 NDVI 业务数据），见 前端对接指南.md。'
+                  : '';
+                if (!hasBasemap && !rasterConfig.demTilesTemplate && !rasterConfig.titiler) {
+                  return (
+                    <>
+                      默认灰色矢量底图（MapLibre 演示样式）。{dem}
+                      行政区界见{' '}
+                      <code className="rounded bg-neutral-100 px-1">packages/data_mock/shenyang.json</code>
+                      。环境变量见{' '}
+                      <code className="rounded bg-neutral-100 px-1">.env.development</code>。
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    {hasBasemap
+                      ? gaodeBasemap
+                        ? '底图：高德 web 瓦片（GCJ-02，与 WGS84 矢量叠加可能有偏差；须遵守高德服务条款）。'
+                        : '底图：自定义 XYZ 栅格。'
+                      : null}
+                    {dem ? ` ${dem}` : ''}
+                    {titilerHint}
+                    行政区界见{' '}
+                    <code className="rounded bg-neutral-100 px-1">packages/data_mock/shenyang.json</code>
+                    。配置 <code className="rounded bg-neutral-100 px-1">VITE_AGRI_GAODE_BASEMAP</code> /{' '}
+                    <code className="rounded bg-neutral-100 px-1">VITE_AGRI_BASEMAP_TILES</code> 等见{' '}
+                    <code className="rounded bg-neutral-100 px-1">.env.development</code>。
+                  </>
+                );
+              })()}
             </Typography.Paragraph>
           </div>
         </Card>

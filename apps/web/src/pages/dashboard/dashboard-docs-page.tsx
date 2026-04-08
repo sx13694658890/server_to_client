@@ -16,8 +16,8 @@ import {
   listCategoryFromMenuKey,
   useDocsCategories,
   useDocsList,
-} from '../features/docs';
-import { useIsAdmin } from '../hooks/use-is-admin';
+} from '../../features/docs';
+import { useIsAdmin } from '../../hooks/use-is-admin';
 
 const PAGE_SIZE = 10;
 

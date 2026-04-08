@@ -2,8 +2,8 @@ import { Card, Typography } from 'antd';
 import type { MessageItem } from '@repo/api';
 import { useDocumentTitle } from 'usehooks-ts';
 import { useNavigate } from 'react-router-dom';
-import { useMessageInboxContext } from '../features/messages/message-inbox-context';
-import { MessageInboxList, MessageInboxTabs } from '../features/messages/message-inbox-ui';
+import { useMessageInboxContext } from '../../features/messages/message-inbox-context';
+import { MessageInboxList, MessageInboxTabs } from '../../features/messages/message-inbox-ui';
 
 export function MessagesCenterPage() {
   useDocumentTitle('通知中心 · client-react-sp');

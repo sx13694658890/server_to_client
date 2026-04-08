@@ -2,13 +2,24 @@ import { getApiErrorMessage } from '@repo/api';
 import { useCallback, useEffect, useState } from 'react';
 import { useWebApi } from '../../hooks/use-web-api';
 import { DOCS_LIST_REFRESH_EVENT } from './docs-refresh-events';
-
-const PAGE = 500;
-/** 防止异常大库拖死页面；超出部分分类可能暂不出现，需后端提供分类接口 */
-const MAX_PAGES = 40;
+import { mergeCategoriesFromDocItems } from './docs-menu-config';
 
 /**
- * 从文档列表聚合后端 `category`（去重、排序），与列表筛选共用同一数据源。
+ * 分类聚合用分页拉列表，单页不宜过大：多数后端对 `limit` 有上限（常见 ≤100），传 500 易 422。
+ */
+const CATEGORY_FETCH_PAGE_SIZE = 100;
+/** 防止异常大库拖死页面；超出部分分类可能暂不出现，需后端提供分类接口 */
+const MAX_PAGES = 200;
+
+function parseListTotal(data: { total?: unknown }): number | undefined {
+  const t = data.total;
+  if (typeof t === 'number' && Number.isFinite(t)) return t;
+  if (typeof t === 'string' && /^\d+$/.test(t.trim())) return Number(t.trim());
+  return undefined;
+}
+
+/**
+ * 分页请求 `GET /docs`（不带 category），从每条 `items[].category` 聚合侧栏分类。
  */
 export function useDocsCategories() {
   const api = useWebApi();
@@ -22,17 +33,21 @@ export function useDocsCategories() {
     const seen = new Set<string>();
     try {
       let offset = 0;
-      let total = 0;
       for (let p = 0; p < MAX_PAGES; p++) {
-        const { data } = await api.docs.list({ limit: PAGE, offset });
-        total = typeof data.total === 'number' ? data.total : 0;
+        const { data } = await api.docs.list({
+          limit: CATEGORY_FETCH_PAGE_SIZE,
+          offset,
+        });
         const items = Array.isArray(data.items) ? data.items : [];
-        for (const it of items) {
-          const c = it.category?.trim();
-          if (c) seen.add(c);
-        }
+        mergeCategoriesFromDocItems(seen, items);
+
+        if (items.length === 0) break;
+
         offset += items.length;
-        if (items.length < PAGE || offset >= total || items.length === 0) break;
+        const total = parseListTotal(data);
+        /** 末页；或未返回合法 total 时仅靠「满页则继续」翻页，避免 total 缺失被当成 0 只拉一页 */
+        if (items.length < CATEGORY_FETCH_PAGE_SIZE) break;
+        if (total !== undefined && offset >= total) break;
       }
       setCategories([...seen].sort((a, b) => a.localeCompare(b, 'zh-CN')));
     } catch (e) {

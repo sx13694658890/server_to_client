@@ -4,13 +4,13 @@ import { useAuth } from '@repo/hooks';
 import { useDocumentTitle } from 'usehooks-ts';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useWebApi } from '../hooks/use-web-api';
-import { zodErrorToFormFieldData } from '../lib/zod-antd';
+import { useWebApi } from '../../hooks/use-web-api';
+import { zodErrorToFormFieldData } from '../../lib/zod-antd';
 import {
   authCredentialsSchema,
   registerResponseSchema,
   type AuthCredentialsFormValues,
-} from '../schemas/auth';
+} from '../../schemas/auth';
 
 export function RegisterPage() {
   useDocumentTitle('注册 · client-react-sp');

@@ -1,7 +1,9 @@
 export { dispatchDocsListRefresh, DOCS_LIST_REFRESH_EVENT } from './docs-refresh-events';
 export {
   buildDocsMenuGroups,
+  buildDocsMenuGroupsFromListItems,
   categoryMenuKey,
+  collectCategoriesFromDocItems,
   DOCS_ALL_MENU_KEY,
   listCategoryFromMenuKey,
   type DocsMenuGroup,

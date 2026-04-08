@@ -101,6 +101,8 @@ apps/web/src/
 - `GET /api/v1/agri/parcels/{id}/timeseries?index=ndvi&from=&to=` — 时序点列。
 - `GET /api/v1/agri/products/{productId}/tiles` — 返回 `{ tileJsonUrl }` 或 `urlTemplate` + `Authorization` 说明。
 
+**栅格服务（TiTiler）**：与业务 API **分离进程**；HTTP 约定见 [前端对接指南.md](./前端对接指南.md)。农业 MVP 由业务接口返回 **TileJSON 完整 URL** 及 **已签名的数据源 `url`**。MapLibre 侧见 [TITILER_FRONTEND.md](./TITILER_FRONTEND.md)；需求侧缺口见 [REQUIREMENTS.md](./REQUIREMENTS.md) §4.1。
+
 产品与瓦片元数据表建议包含：`parcel_id` 或 `tile_grid_id`、`date`、`index_type`、`cog_uri`、`min/max` 用于图例。
 
 ### 3.3 指数计算流水线（离线/异步）
@@ -151,3 +153,4 @@ apps/web/src/
 
 - 需求变更请更新 `REQUIREMENTS.md` 并同步本文件里程碑与接口表。
 - OpenAPI 定稿后可在 `docs/agri-remote-sensing/` 下增加 `openapi-notes.md` 链接到生成物。
+- TiTiler 前端对接见 [前端对接指南.md](./前端对接指南.md)；MapLibre 见 [TITILER_FRONTEND.md](./TITILER_FRONTEND.md)。

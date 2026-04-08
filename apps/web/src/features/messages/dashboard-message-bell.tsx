@@ -104,7 +104,7 @@ export function DashboardMessageBell() {
       trigger="click"
       placement="bottomRight"
       arrow={false}
-      overlayInnerStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
       content={panel}
     >
       <Badge count={unreadCount > 0 ? unreadCount : 0} size="small" offset={[-2, 8]}>

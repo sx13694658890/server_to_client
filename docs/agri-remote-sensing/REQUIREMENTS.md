@@ -92,6 +92,20 @@
 - `GET` 某期产品的**瓦片模板 URL** 或 **COG 访问地址**（带短期签名或网关鉴权）。
 - 可选：`POST` 上传/修正地块边界（二期）。
 
+### 4.1 与本仓库服务端现状对照（补充）
+
+便于评审「需求 vs 已实现」，下列为 **server_python** 当前能力与缺口（随迭代更新）。
+
+| 需求方向 | 现状 | 建议服务端补充 |
+|----------|------|----------------|
+| 动态 COG 瓦片（TiTiler） | **独立进程** 提供 TiTiler 能力（`TilerFactory`）；**本仓库 Web 不内嵌** 切片服务。接口与路径见 [前端对接指南.md](./前端对接指南.md)。 | 网关、监控、超时；COG 仅 TiTiler 可达时的网络策略。 |
+| 业务层：产品元数据 + 安全瓦片 URL | **未实现** `/api/v1/agri/...`。 | 提供 `GET .../products/{id}/layer`（或等价）返回 **已鉴权场景下** 的 `tileJsonUrl` / `urlTemplate`，其中 **COG 地址为对象存储短期签名 URL**，避免前端拼接裸 `url=`。 |
+| 地块矢量、组织权限、时序统计 | **未实现** PostGIS 与农业业务 API。 | 按 §4 列表实现 `parcels`、`timeseries`；与 TiTiler 仅通过「后端下发的 COG URL」衔接。 |
+| 瓦片请求鉴权 | TiTiler 为**独立服务**，与本仓库 JWT 无直接耦合。 | 网关鉴权、内网部署、API Key、或仅预签名 COG URL；限制 `url` 来源以防 SSRF/盗链。 |
+| 跨域 | 本仓库业务 API 默认未全局开启 CORS。 | 前端直连 **TiTiler 基址** 拉瓦片时，在 **TiTiler 侧** 配置 CORS（见 [前端对接指南.md](./前端对接指南.md) §5），或同源反代。 |
+
+前端 HTTP 路径与调试见 [前端对接指南.md](./前端对接指南.md)；MapLibre 补充见 [TITILER_FRONTEND.md](./TITILER_FRONTEND.md)。
+
 ---
 
 ## 5. 范围边界
@@ -137,3 +151,4 @@
 ## 9. 关联文档
 
 - 技术选型与实施步骤见同目录 [DEV_PLAN.md](./DEV_PLAN.md)。
+- TiTiler 与前端对接见 [前端对接指南.md](./前端对接指南.md)；MapLibre 说明见 [TITILER_FRONTEND.md](./TITILER_FRONTEND.md)。

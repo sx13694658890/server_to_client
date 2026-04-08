@@ -15,10 +15,10 @@ import {
   DocsSidebar,
   DOCS_ALL_MENU_KEY,
   useDocsCategories,
-} from '../features/docs';
-import { formatDocDateTime } from '../features/docs/format-doc-time';
-import { useIsAdmin } from '../hooks/use-is-admin';
-import { useWebApi } from '../hooks/use-web-api';
+} from '../../features/docs';
+import { formatDocDateTime } from '../../features/docs/format-doc-time';
+import { useIsAdmin } from '../../hooks/use-is-admin';
+import { useWebApi } from '../../hooks/use-web-api';
 
 const SOURCE_LABEL: Record<DocContentSource, string> = {
   repo: '仓库',

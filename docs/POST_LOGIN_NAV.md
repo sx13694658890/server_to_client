@@ -62,8 +62,8 @@
 | `apps/web/src/features/messages/dashboard-message-bell.tsx` | 顶栏通知：角标、抽屉、SSE + 轮询。 |
 | `packages/api/src/apis/messages.api.ts` | 站内通知 REST。 |
 | `packages/api/src/apis/messages-stream.api.ts` | `GET /messages/stream` SSE 解析。 |
-| `apps/web/src/pages/account-page.tsx` | 个人中心：修改密码表单。 |
-| `apps/web/src/pages/users-management-page.tsx` | 用户列表、分页与 **admin 删除**（二次确认）。 |
+| `apps/web/src/pages/dashboard/account-page.tsx` | 个人中心：修改密码表单。 |
+| `apps/web/src/pages/dashboard/users-management-page.tsx` | 用户列表、分页与 **admin 删除**（二次确认）。 |
 | `packages/api/src/apis/users.api.ts` | `GET /users`、`DELETE /users/{id}`（`users.remove`）类型与封装。 |
 | [FRONTEND_API.md](./FRONTEND_API.md) | HTTP 接口、JWT、错误格式。 |
 | [FRONTEND.md](./FRONTEND.md) | 对接总览、工程与安全、索引。 |

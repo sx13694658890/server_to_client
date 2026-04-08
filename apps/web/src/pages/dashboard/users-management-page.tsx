@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { getApiErrorMessage, type UserListItem } from '@repo/api';
 import { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from 'usehooks-ts';
-import { useWebApi } from '../hooks/use-web-api';
+import { useWebApi } from '../../hooks/use-web-api';
 
 const PAGE_SIZE = 10;
 
