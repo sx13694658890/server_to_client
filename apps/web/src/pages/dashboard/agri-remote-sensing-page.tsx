@@ -1,13 +1,14 @@
-import { InfoCircleOutlined, GlobalOutlined } from '@ant-design/icons';
-import { App, Alert, Card, List, Space, Switch, Table, Tag, Typography } from 'antd';
+import { GlobalOutlined } from '@ant-design/icons';
+import { App, Alert, Button, Card, List, Space, Switch, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { FeatureCollection } from 'geojson';
+import type { Feature, FeatureCollection, Polygon } from 'geojson';
 import agriDemo from '@repo/data-mock/agri-demo.json';
 import shenyangBoundary from '@repo/data-mock/shenyang.json';
 import { useDocumentTitle } from 'usehooks-ts';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AgriMapView,
+  type AgriMapViewHandle,
   AgriTimeseriesChart,
   getAgriMapRasterConfig,
   hasAgriRasterLayers,
@@ -44,6 +45,9 @@ export function AgriRemoteSensingPage() {
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(parcelRows[0]?.id ?? null);
+  const [drawMode, setDrawMode] = useState(false);
+  const [lastDrawn, setLastDrawn] = useState<Feature<Polygon> | null>(null);
+  const mapHandleRef = useRef<AgriMapViewHandle>(null);
 
   const selectedParcel = parcelRows.find((r) => r.id === selectedId);
   const series: NdviPoint[] = selectedId ? (demo.timeseries[selectedId] ?? []) : [];
@@ -59,6 +63,37 @@ export function AgriRemoteSensingPage() {
     },
     [message]
   );
+
+  const onDrawPolygon = useCallback(
+    (feature: Feature<Polygon>) => {
+      setDrawMode(false);
+      setLastDrawn(feature);
+      const ring = feature.geometry.coordinates[0] ?? [];
+      const n = ring.length > 1 && ring[0]![0] === ring[ring.length - 1]![0] && ring[0]![1] === ring[ring.length - 1]![1] ? ring.length - 1 : ring.length;
+      message.success(`已圈定区域（${n} 个顶点），可在控制台或后续接口中使用 GeoJSON。`);
+      if (import.meta.env.DEV) console.info('[agri-draw] polygon', feature);
+    },
+    [message]
+  );
+
+  const onDrawCancel = useCallback(() => {
+    setDrawMode(false);
+  }, []);
+
+  const startDraw = useCallback(() => {
+    setDrawMode(true);
+    message.info('在地图上依次点击添加顶点，点「完成圈地」闭合；Esc 取消。');
+  }, [message]);
+
+  const completeDraw = useCallback(() => {
+    const ok = mapHandleRef.current?.completeDraw() ?? false;
+    if (!ok) message.warning('至少需要 3 个顶点才能完成圈地。');
+  }, [message]);
+
+  const cancelDraw = useCallback(() => {
+    mapHandleRef.current?.cancelDraw();
+    setDrawMode(false);
+  }, []);
 
   const columns: ColumnsType<ParcelRow> = [
     { title: '地块', dataIndex: 'name', key: 'name', ellipsis: true },
@@ -100,14 +135,6 @@ export function AgriRemoteSensingPage() {
           />
         </Space>
       </div>
-
-      <Alert
-        type="info"
-        showIcon
-        icon={<InfoCircleOutlined />}
-        message={demo.meta.dataDisclaimer}
-        className="text-sm"
-      />
 
       {import.meta.env.DEV && !rasterConfig.titiler ? (
         <Alert
@@ -153,15 +180,47 @@ export function AgriRemoteSensingPage() {
           />
         </Card>
 
-        <Card size="small" title="地图" className="shadow-sm">
+        <Card
+          size="small"
+          title="地图"
+          className="shadow-sm"
+          extra={
+            <Space size="small" wrap>
+              {!drawMode ? (
+                <Button size="small" type="default" onClick={startDraw}>
+                  圈地
+                </Button>
+              ) : (
+                <>
+                  <Button size="small" type="primary" onClick={completeDraw}>
+                    完成圈地
+                  </Button>
+                  <Button size="small" onClick={cancelDraw}>
+                    取消
+                  </Button>
+                </>
+              )}
+            </Space>
+          }
+        >
           <AgriMapView
+            ref={mapHandleRef}
             boundary={boundary}
             parcels={demo.parcels}
             selectedParcelId={selectedId}
             onSelectParcel={onSelectParcel}
             rasterConfig={rasterConfig}
             onTitilerError={rasterConfig.titiler ? onTitilerError : undefined}
+            drawMode={drawMode}
+            onDrawPolygon={onDrawPolygon}
+            onDrawCancel={onDrawCancel}
           />
+          {lastDrawn ? (
+            <Typography.Paragraph type="secondary" className="mb-0 mt-2 text-xs">
+              最近一次圈地：已保存为 GeoJSON Polygon（{lastDrawn.geometry.coordinates[0]?.length ?? 0}{' '}
+              个坐标点，含闭合重复点）。
+            </Typography.Paragraph>
+          ) : null}
           <div className="mt-3 border-t border-neutral-100 pt-3">
             <Typography.Text type="secondary" className="mb-2 block text-xs">
               NDVI 填色（地块均值 · 演示）
@@ -172,53 +231,6 @@ export function AgriRemoteSensingPage() {
               <LegendStop color="#91cf60" label="0.55–0.70" />
               <LegendStop color="#1a9850" label="&gt;0.70" />
             </div>
-            <Typography.Paragraph type="secondary" className="!mb-0 !mt-2 text-xs">
-              {(() => {
-                const hasBasemap = Boolean(
-                  rasterConfig.basemapRasterTileUrls?.length || rasterConfig.basemapRasterTiles
-                );
-                const gaodeBasemap = rasterConfig.basemapRasterTileUrls?.some((u) =>
-                  u.includes('is.autonavi.com')
-                );
-                const dem = rasterConfig.demTilesTemplate
-                  ? `高程晕渲（${rasterConfig.demEncoding}）${
-                      rasterConfig.terrainExaggeration
-                        ? ` · 三维 ×${rasterConfig.terrainExaggeration}`
-                        : ''
-                    }。`
-                  : '';
-                const titilerHint = rasterConfig.titiler
-                  ? ' TiTiler：TileJSON → raster 叠在地块之下；默认 COG 为公网样例（非 NDVI 业务数据），见 前端对接指南.md。'
-                  : '';
-                if (!hasBasemap && !rasterConfig.demTilesTemplate && !rasterConfig.titiler) {
-                  return (
-                    <>
-                      默认灰色矢量底图（MapLibre 演示样式）。{dem}
-                      行政区界见{' '}
-                      <code className="rounded bg-neutral-100 px-1">packages/data_mock/shenyang.json</code>
-                      。环境变量见{' '}
-                      <code className="rounded bg-neutral-100 px-1">.env.development</code>。
-                    </>
-                  );
-                }
-                return (
-                  <>
-                    {hasBasemap
-                      ? gaodeBasemap
-                        ? '底图：高德 web 瓦片（GCJ-02，与 WGS84 矢量叠加可能有偏差；须遵守高德服务条款）。'
-                        : '底图：自定义 XYZ 栅格。'
-                      : null}
-                    {dem ? ` ${dem}` : ''}
-                    {titilerHint}
-                    行政区界见{' '}
-                    <code className="rounded bg-neutral-100 px-1">packages/data_mock/shenyang.json</code>
-                    。配置 <code className="rounded bg-neutral-100 px-1">VITE_AGRI_GAODE_BASEMAP</code> /{' '}
-                    <code className="rounded bg-neutral-100 px-1">VITE_AGRI_BASEMAP_TILES</code> 等见{' '}
-                    <code className="rounded bg-neutral-100 px-1">.env.development</code>。
-                  </>
-                );
-              })()}
-            </Typography.Paragraph>
           </div>
         </Card>
       </div>

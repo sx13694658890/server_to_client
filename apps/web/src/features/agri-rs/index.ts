@@ -1,4 +1,4 @@
-export { AgriMapView } from './agri-map-view';
+export { AgriMapView, type AgriMapViewHandle } from './agri-map-view';
 export {
   getAgriMapRasterConfig,
   hasAgriRasterLayers,

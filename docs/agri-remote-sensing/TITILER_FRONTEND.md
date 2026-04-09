@@ -43,7 +43,7 @@ map.addSource('ndvi-layer', {
 
 见 `apps/web/.env.development` 与 **[前端对接指南.md](./前端对接指南.md) §3.2、§5**。
 
-- 默认 `VITE_AGRI_TITILER_COG_URL` 为 OSGeo 公网样例，**与农业演示地块地理位置无关**，仅验证链路。  
+- 默认 `VITE_AGRI_TITILER_COG_URL` 为 OSGeo 芝加哥样例，**与沈阳演示地块范围不重叠**；初始视口按 **全部演示 `parcels` 外包框** `fitBounds`（带边距），以便看全分散地块；此视口内仍不会出现该样例栅格，换与范围重叠的 COG 即可。  
 - 未配置 COG / TileJSON 时地图仍可用，不叠加 TiTiler 栅格。
 
 ---

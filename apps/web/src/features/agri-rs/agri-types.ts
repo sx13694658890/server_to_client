@@ -9,7 +9,6 @@ export type NdviPoint = {
 export type AgriDemoMeta = {
   regionName: string;
   indexLabel: string;
-  dataDisclaimer: string;
 };
 
 export type AgriDemoData = {

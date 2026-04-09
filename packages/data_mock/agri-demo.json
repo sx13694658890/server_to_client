@@ -1,8 +1,7 @@
 {
   "meta": {
     "regionName": "沈阳市（演示区）",
-    "indexLabel": "NDVI",
-    "dataDisclaimer": "当前为本地静态演示数据，非实时卫星产品；栅格图层待接入 TiTiler/XYZ 服务。"
+    "indexLabel": "NDVI"
   },
   "parcels": {
     "type": "FeatureCollection",

@@ -1,9 +1,129 @@
-import type { FeatureCollection } from 'geojson';
+import type { Feature, FeatureCollection, Geometry, Polygon } from 'geojson';
 import maplibregl, { type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { AgriMapRasterConfig } from './agri-map-config';
 import { resolveStandaloneTitilerTileJsonUrl, type TitilerTileJson } from './titiler';
+
+type LngLatBounds = { minLng: number; minLat: number; maxLng: number; maxLat: number };
+
+function extendLngLatBounds(lng: number, lat: number, b: LngLatBounds | null): LngLatBounds | null {
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return b;
+  if (!b) return { minLng: lng, maxLng: lng, minLat: lat, maxLat: lat };
+  return {
+    minLng: Math.min(b.minLng, lng),
+    maxLng: Math.max(b.maxLng, lng),
+    minLat: Math.min(b.minLat, lat),
+    maxLat: Math.max(b.maxLat, lat),
+  };
+}
+
+/** 遍历 GeoJSON 坐标嵌套数组，收集二维点 */
+function walkGeoJsonCoords(node: unknown, b: LngLatBounds | null): LngLatBounds | null {
+  if (!Array.isArray(node)) return b;
+  const arr = node as unknown[];
+  if (
+    arr.length >= 2 &&
+    typeof arr[0] === 'number' &&
+    typeof arr[1] === 'number' &&
+    !Array.isArray(arr[0])
+  ) {
+    return extendLngLatBounds(arr[0], arr[1], b);
+  }
+  let out = b;
+  for (const c of arr) {
+    out = walkGeoJsonCoords(c, out);
+  }
+  return out;
+}
+
+function boundsFromFeatureCollection(fc: FeatureCollection): LngLatBounds | null {
+  let b: LngLatBounds | null = null;
+  for (const f of fc.features) {
+    const coords = f.geometry && 'coordinates' in f.geometry ? f.geometry.coordinates : null;
+    if (coords != null) b = walkGeoJsonCoords(coords, b);
+  }
+  return b;
+}
+
+function polygonRingCentroid(ring: number[][]): [number, number] {
+  let sumLng = 0;
+  let sumLat = 0;
+  let n = 0;
+  const len = ring.length;
+  const end =
+    len > 1 && ring[0]![0] === ring[len - 1]![0] && ring[0]![1] === ring[len - 1]![1] ? len - 1 : len;
+  for (let i = 0; i < end; i++) {
+    const p = ring[i]!;
+    sumLng += p[0]!;
+    sumLat += p[1]!;
+    n++;
+  }
+  return n > 0 ? [sumLng / n, sumLat / n] : [ring[0]![0], ring[0]![1]];
+}
+
+function geometryLabelPoint(geometry: Geometry): [number, number] | null {
+  if (geometry.type === 'Polygon') {
+    const ring = geometry.coordinates[0];
+    return ring?.length ? polygonRingCentroid(ring) : null;
+  }
+  if (geometry.type === 'MultiPolygon') {
+    const ring = geometry.coordinates[0]?.[0];
+    return ring?.length ? polygonRingCentroid(ring) : null;
+  }
+  return null;
+}
+
+/** 区县中心（properties.center）+ 地块多边形质心，供 symbol 图层显示地名 */
+function buildPlaceLabelFeatures(
+  boundaryFc: FeatureCollection,
+  parcelsFc: FeatureCollection
+): FeatureCollection {
+  const features: Feature[] = [];
+
+  for (const f of boundaryFc.features) {
+    const p = f.properties as Record<string, unknown> | null;
+    const name = p && typeof p.name === 'string' ? p.name : null;
+    const center = (p?.center ?? p?.centroid) as unknown;
+    if (
+      name &&
+      Array.isArray(center) &&
+      center.length >= 2 &&
+      typeof center[0] === 'number' &&
+      typeof center[1] === 'number'
+    ) {
+      features.push({
+        type: 'Feature',
+        properties: { name, kind: 'district' },
+        geometry: { type: 'Point', coordinates: [center[0], center[1]] },
+      });
+    }
+  }
+
+  for (const f of parcelsFc.features) {
+    const p = f.properties as Record<string, unknown> | null;
+    const name = p && typeof p.name === 'string' ? p.name : null;
+    if (name && f.geometry) {
+      const pt = geometryLabelPoint(f.geometry);
+      if (pt) {
+        features.push({
+          type: 'Feature',
+          properties: { name, kind: 'parcel' },
+          geometry: { type: 'Point', coordinates: pt },
+        });
+      }
+    }
+  }
+
+  return { type: 'FeatureCollection', features };
+}
+
+export type AgriMapViewHandle = {
+  /** 将当前折线闭合为 Polygon（至少 3 个顶点），成功则触发 onDrawPolygon 并清空草稿 */
+  completeDraw: () => boolean;
+  /** 清空当前圈地草稿 */
+  cancelDraw: () => void;
+};
 
 type Props = {
   boundary: FeatureCollection;
@@ -14,6 +134,12 @@ type Props = {
   rasterConfig?: AgriMapRasterConfig | null;
   /** TiTiler TileJSON / 瓦片加载失败时回调（不经业务后端） */
   onTitilerError?: (message: string) => void;
+  /** 为 true 时：地图点击追加顶点、显示预览，不触发地块选中 */
+  drawMode?: boolean;
+  /** 完成圈地（至少 3 点）时回调 */
+  onDrawPolygon?: (feature: Feature<Polygon>) => void;
+  /** 按 Esc 或外部取消时可选通知父组件同步状态 */
+  onDrawCancel?: () => void;
 };
 
 const MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
@@ -22,6 +148,7 @@ const MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
 const MINIMAL_STYLE: StyleSpecification = {
   version: 8,
   name: 'agri-minimal',
+  glyphs: 'https://demotiles.maplibre.org/fonts/{fontstack}/{range}.pbf',
   sources: {},
   layers: [
     {
@@ -32,20 +159,40 @@ const MINIMAL_STYLE: StyleSpecification = {
   ],
 };
 
-export function AgriMapView({
-  boundary,
-  parcels,
-  selectedParcelId,
-  onSelectParcel,
-  rasterConfig = null,
-  onTitilerError,
-}: Props) {
+export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMapView(
+  {
+    boundary,
+    parcels,
+    selectedParcelId,
+    onSelectParcel,
+    rasterConfig = null,
+    onTitilerError,
+    drawMode = false,
+    onDrawPolygon,
+    onDrawCancel,
+  },
+  forwardedRef
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const onSelectRef = useRef(onSelectParcel);
   const selectedRef = useRef(selectedParcelId);
+  const drawModeRef = useRef(drawMode);
+  const onDrawPolygonRef = useRef(onDrawPolygon);
+  const draftVerticesRef = useRef<[number, number][]>([]);
+  const previewLngLatRef = useRef<[number, number] | null>(null);
+  const syncDrawDraftRef = useRef<(() => void) | null>(null);
+  const drawControlRef = useRef<{ complete: () => boolean; cancel: () => void } | null>(null);
+
   onSelectRef.current = onSelectParcel;
   selectedRef.current = selectedParcelId;
+  drawModeRef.current = drawMode;
+  onDrawPolygonRef.current = onDrawPolygon;
+
+  useImperativeHandle(forwardedRef, () => ({
+    completeDraw: () => drawControlRef.current?.complete() ?? false,
+    cancelDraw: () => drawControlRef.current?.cancel(),
+  }));
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -63,12 +210,16 @@ export function AgriMapView({
       style: useMinimalStyle ? MINIMAL_STYLE : MAP_STYLE,
       center: [123.4, 41.85],
       zoom: 8.2,
+      localIdeographFontFamily: "'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif",
+      attributionControl: false,
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;
 
     let cancelled = false;
+    let onDrawClickHandler: ((e: maplibregl.MapMouseEvent) => void) | undefined;
+    let onDrawMoveHandler: ((e: maplibregl.MapMouseEvent) => void) | undefined;
 
     const onResize = () => map.resize();
     window.addEventListener('resize', onResize);
@@ -187,19 +338,204 @@ export function AgriMapView({
         filter: ['==', ['get', 'id'], '__none__'],
       });
 
+      const labelFc = buildPlaceLabelFeatures(boundary, parcels);
+      map.addSource('place-labels', { type: 'geojson', data: labelFc });
+      map.addLayer({
+        id: 'district-name-labels',
+        type: 'symbol',
+        source: 'place-labels',
+        filter: ['==', ['get', 'kind'], 'district'],
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-size': 13,
+          'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+          'text-anchor': 'center',
+          'text-allow-overlap': false,
+          'text-ignore-placement': false,
+        },
+        paint: {
+          'text-color': '#0f172a',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.8,
+          'text-halo-blur': 0.4,
+        },
+      });
+      map.addLayer({
+        id: 'parcel-name-labels',
+        type: 'symbol',
+        source: 'place-labels',
+        filter: ['==', ['get', 'kind'], 'parcel'],
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-size': 12,
+          'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+          'text-anchor': 'center',
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#14532d',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 2,
+          'text-halo-blur': 0.3,
+        },
+      });
+
+      map.addSource('draw-draft', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      map.addLayer({
+        id: 'draw-draft-fill',
+        type: 'fill',
+        source: 'draw-draft',
+        filter: ['==', ['geometry-type'], 'Polygon'],
+        paint: { 'fill-color': '#d97706', 'fill-opacity': 0.22 },
+      });
+      map.addLayer({
+        id: 'draw-draft-line',
+        type: 'line',
+        source: 'draw-draft',
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: {
+          'line-color': '#b45309',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+        },
+      });
+      map.addLayer({
+        id: 'draw-draft-verts',
+        type: 'circle',
+        source: 'draw-draft',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#ea580c',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#ffffff',
+        },
+      });
+
+      const syncDrawDraft = () => {
+        if (cancelled || !map.getSource('draw-draft')) return;
+        const verts = draftVerticesRef.current;
+        const pv = previewLngLatRef.current;
+        const features: Feature[] = [];
+        if (verts.length >= 1) {
+          const lineCoords: [number, number][] = [...verts];
+          if (pv) lineCoords.push(pv);
+          features.push({
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'LineString', coordinates: lineCoords },
+          });
+        }
+        if (verts.length >= 2 && pv) {
+          const ring: [number, number][] = [...verts, pv, verts[0]!];
+          features.push({
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Polygon', coordinates: [ring] },
+          });
+        }
+        for (let i = 0; i < verts.length; i++) {
+          features.push({
+            type: 'Feature',
+            properties: { v: i },
+            geometry: { type: 'Point', coordinates: verts[i]! },
+          });
+        }
+        (map.getSource('draw-draft') as maplibregl.GeoJSONSource).setData({
+          type: 'FeatureCollection',
+          features,
+        });
+      };
+      syncDrawDraftRef.current = syncDrawDraft;
+
+      drawControlRef.current = {
+        complete: () => {
+          const v = draftVerticesRef.current;
+          if (v.length < 3) return false;
+          const ring: [number, number][] = [...v, v[0]!];
+          const feature: Feature<Polygon> = {
+            type: 'Feature',
+            properties: { source: 'agri-draw' },
+            geometry: { type: 'Polygon', coordinates: [ring] },
+          };
+          onDrawPolygonRef.current?.(feature);
+          draftVerticesRef.current = [];
+          previewLngLatRef.current = null;
+          syncDrawDraft();
+          return true;
+        },
+        cancel: () => {
+          draftVerticesRef.current = [];
+          previewLngLatRef.current = null;
+          syncDrawDraft();
+        },
+      };
+
+      onDrawClickHandler = (e: maplibregl.MapMouseEvent) => {
+        if (!drawModeRef.current || cancelled) return;
+        draftVerticesRef.current = [...draftVerticesRef.current, [e.lngLat.lng, e.lngLat.lat]];
+        previewLngLatRef.current = null;
+        syncDrawDraft();
+      };
+      onDrawMoveHandler = (e: maplibregl.MapMouseEvent) => {
+        if (!drawModeRef.current || cancelled || draftVerticesRef.current.length === 0) {
+          if (previewLngLatRef.current) {
+            previewLngLatRef.current = null;
+            syncDrawDraft();
+          }
+          return;
+        }
+        previewLngLatRef.current = [e.lngLat.lng, e.lngLat.lat];
+        syncDrawDraft();
+      };
+      map.on('click', onDrawClickHandler);
+      map.on('mousemove', onDrawMoveHandler);
+
       map.on('click', 'parcels-fill', (e) => {
+        if (drawModeRef.current) return;
         const f = e.features?.[0];
         const id = f?.properties?.id;
         if (typeof id === 'string') onSelectRef.current(id);
       });
       map.on('mouseenter', 'parcels-fill', () => {
+        if (drawModeRef.current) {
+          map.getCanvas().style.cursor = 'crosshair';
+          return;
+        }
         map.getCanvas().style.cursor = 'pointer';
       });
       map.on('mouseleave', 'parcels-fill', () => {
+        if (drawModeRef.current) {
+          map.getCanvas().style.cursor = 'crosshair';
+          return;
+        }
         map.getCanvas().style.cursor = '';
       });
 
       applySelection(selectedRef.current);
+
+      const parcelExtent = boundsFromFeatureCollection(parcels);
+      if (parcelExtent) {
+        const { minLng, minLat, maxLng, maxLat } = parcelExtent;
+        const w = maxLng - minLng;
+        const h = maxLat - minLat;
+        const padLng = w < 1e-6 ? 0.02 : w * 0.06;
+        const padLat = h < 1e-6 ? 0.02 : h * 0.06;
+        try {
+          map.fitBounds(
+            [
+              [minLng - padLng, minLat - padLat],
+              [maxLng + padLng, maxLat + padLat],
+            ],
+            { padding: 32, duration: 0, maxZoom: 12 }
+          );
+        } catch {
+          /* ignore */
+        }
+      }
 
       if (titilerCfg) {
         const tileJsonUrl = resolveStandaloneTitilerTileJsonUrl({
@@ -262,25 +598,10 @@ export function AgriMapView({
             'parcels-fill'
           );
 
-          // 默认视口在演示地块（沈阳）；COG 若在其它地区（如默认 OSGeo 芝加哥样例），不缩放到数据范围则视口内无瓦片，且 minzoom 常 > 初始 zoom。
-          if (tj.bounds != null && tj.bounds.length === 4) {
-            const [west, south, east, north] = tj.bounds;
-            try {
-              map.fitBounds(
-                [
-                  [west, south],
-                  [east, north],
-                ],
-                {
-                  padding: 40,
-                  maxZoom: tj.maxzoom != null ? Math.min(tj.maxzoom, 18) : 18,
-                  minZoom: tj.minzoom ?? undefined,
-                  duration: 600,
-                }
-              );
-            } catch {
-              /* 无效 bounds 时忽略 */
-            }
+          if (map.getLayer('district-name-labels')) map.moveLayer('district-name-labels');
+          if (map.getLayer('parcel-name-labels')) map.moveLayer('parcel-name-labels');
+          for (const lid of ['draw-draft-fill', 'draw-draft-line', 'draw-draft-verts'] as const) {
+            if (map.getLayer(lid)) map.moveLayer(lid);
           }
         };
 
@@ -311,11 +632,38 @@ export function AgriMapView({
 
     return () => {
       cancelled = true;
+      if (onDrawClickHandler) map.off('click', onDrawClickHandler);
+      if (onDrawMoveHandler) map.off('mousemove', onDrawMoveHandler);
+      drawControlRef.current = null;
+      syncDrawDraftRef.current = null;
       window.removeEventListener('resize', onResize);
       map.remove();
       mapRef.current = null;
     };
   }, [boundary, parcels, rasterConfig, onTitilerError]);
+
+  useEffect(() => {
+    if (!drawMode) {
+      draftVerticesRef.current = [];
+      previewLngLatRef.current = null;
+      syncDrawDraftRef.current?.();
+    }
+    const m = mapRef.current;
+    if (m?.getCanvas()) {
+      m.getCanvas().style.cursor = drawMode ? 'crosshair' : '';
+    }
+  }, [drawMode]);
+
+  useEffect(() => {
+    if (!drawMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      drawControlRef.current?.cancel();
+      onDrawCancel?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawMode, onDrawCancel]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -336,4 +684,4 @@ export function AgriMapView({
       aria-label="农业遥感地图"
     />
   );
-}
+});

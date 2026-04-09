@@ -1,4 +1,4 @@
-import { App as AntApp, ConfigProvider, Spin } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AuthProvider } from '@repo/hooks';
 import { lazy, Suspense } from 'react';
@@ -44,15 +44,7 @@ export function App() {
                   <Route
                     path="agri"
                     element={
-                      <Suspense
-                        fallback={
-                          <div className="flex min-h-[40vh] items-center justify-center p-8">
-                            <Spin size="large" tip="加载农业遥感模块…">
-                              <div className="min-h-[200px] w-[min(100%,24rem)]" aria-hidden />
-                            </Spin>
-                          </div>
-                        }
-                      >
+                      <Suspense fallback={null}>
                         <AgriRemoteSensingPage />
                       </Suspense>
                     }
