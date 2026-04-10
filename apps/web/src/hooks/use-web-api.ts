@@ -1,4 +1,5 @@
 import {
+  createAgriApi,
   createAiApi,
   createAuthApi,
   createDocsApi,
@@ -41,6 +42,7 @@ export function useWebApi() {
       users: createUsersApi(bundle.client),
       messages: createMessagesApi(bundle.client),
       docs: createDocsApi(bundle.client),
+      agri: createAgriApi(bundle.client),
     };
   }, [accessToken, clearAuth, navigate]);
 }

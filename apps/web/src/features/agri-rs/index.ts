@@ -16,3 +16,4 @@ export {
 } from './titiler';
 export { AgriTimeseriesChart } from './agri-timeseries-chart';
 export type { AgriDemoData, AgriDemoMeta, NdviPoint } from './agri-types';
+export { EMPTY_AGRI_BOUNDARY, mapAgriDemoBundleResponse } from './agri-demo-bundle-map';

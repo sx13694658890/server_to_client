@@ -9,6 +9,10 @@ export type NdviPoint = {
 export type AgriDemoMeta = {
   regionName: string;
   indexLabel: string;
+  indexKey?: string;
+  demo?: boolean;
+  /** ISO 8601，来自服务端 `updated_at` */
+  updatedAt?: string;
 };
 
 export type AgriDemoData = {

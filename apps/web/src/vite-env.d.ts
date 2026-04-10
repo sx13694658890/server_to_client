@@ -35,6 +35,8 @@ interface ImportMetaEnv {
   readonly VITE_AGRI_TITILER_RESCALE?: string;
   readonly VITE_AGRI_TITILER_COLORMAP_NAME?: string;
   readonly VITE_AGRI_TITILER_OPACITY?: string;
+  /** 可选：固定 `GET /agri/demo-bundle?region_id=`，省略则用服务端首个 demo 区域 */
+  readonly VITE_AGRI_REGION_ID?: string;
 }
 
 interface ImportMeta {

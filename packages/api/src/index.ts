@@ -45,3 +45,10 @@ export {
   type DocUploadResult,
 } from './apis/docs.api';
 export { readMessagesStream, type MessageStreamHandlers } from './apis/messages-stream.api';
+export {
+  createAgriApi,
+  type AgriBundleMetaOut,
+  type AgriDemoBundleOut,
+  type AgriParcelsGeoJson,
+  type AgriTimeseriesPointOut,
+} from './apis/agri.api';

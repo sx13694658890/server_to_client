@@ -1,22 +1,21 @@
 import { GlobalOutlined } from '@ant-design/icons';
-import { App, Alert, Button, Card, List, Space, Switch, Table, Tag, Typography } from 'antd';
+import { App, Alert, Button, Card, List, Space, Spin, Switch, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { Feature, FeatureCollection, Polygon } from 'geojson';
-import agriDemo from '@repo/data-mock/agri-demo.json';
-import shenyangBoundary from '@repo/data-mock/shenyang.json';
+import type { Feature, Polygon } from 'geojson';
+import { getApiErrorMessage } from '@repo/api';
 import { useDocumentTitle } from 'usehooks-ts';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AgriMapView,
   type AgriMapViewHandle,
   AgriTimeseriesChart,
+  EMPTY_AGRI_BOUNDARY,
   getAgriMapRasterConfig,
   hasAgriRasterLayers,
+  mapAgriDemoBundleResponse,
 } from '../../features/agri-rs';
 import type { AgriDemoData, NdviPoint } from '../../features/agri-rs';
-
-const demo = agriDemo as AgriDemoData;
-const boundary = shenyangBoundary as FeatureCollection;
+import { useWebApi } from '../../hooks/use-web-api';
 
 type ParcelRow = {
   id: string;
@@ -26,31 +25,71 @@ type ParcelRow = {
   ndvi_latest: number;
 };
 
+function firstParcelId(parcels: AgriDemoData['parcels']): string | null {
+  const f = parcels.features[0];
+  const p = f?.properties as Record<string, unknown> | null | undefined;
+  const id = p?.id;
+  return id != null ? String(id) : null;
+}
+
+function parcelsToRows(parcels: AgriDemoData['parcels']): ParcelRow[] {
+  return parcels.features.map((f) => {
+    const p = f.properties as Record<string, unknown>;
+    const area = Number(p.area_ha);
+    const ndvi = Number(p.ndvi_latest);
+    return {
+      id: String(p.id ?? ''),
+      name: String(p.name ?? ''),
+      crop: String(p.crop ?? '—'),
+      area_ha: Number.isFinite(area) ? area : 0,
+      ndvi_latest: Number.isFinite(ndvi) ? ndvi : 0,
+    };
+  });
+}
+
 export function AgriRemoteSensingPage() {
   useDocumentTitle('农业遥感 · client-react-sp');
   const { message } = App.useApp();
-  const parcelRows: ParcelRow[] = useMemo(
-    () =>
-      demo.parcels.features.map((f) => {
-        const p = f.properties as Record<string, unknown>;
-        return {
-          id: String(p.id),
-          name: String(p.name),
-          crop: String(p.crop),
-          area_ha: Number(p.area_ha),
-          ndvi_latest: Number(p.ndvi_latest),
-        };
-      }),
-    []
-  );
+  const api = useWebApi();
 
-  const [selectedId, setSelectedId] = useState<string | null>(parcelRows[0]?.id ?? null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<AgriDemoData | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawMode, setDrawMode] = useState(false);
   const [lastDrawn, setLastDrawn] = useState<Feature<Polygon> | null>(null);
   const mapHandleRef = useRef<AgriMapViewHandle>(null);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const regionId = import.meta.env.VITE_AGRI_REGION_ID?.trim();
+      const { data: raw } = await api.agri.getDemoBundle(
+        regionId ? { region_id: regionId } : undefined
+      );
+      const next = mapAgriDemoBundleResponse(raw);
+      setData(next);
+      setSelectedId(firstParcelId(next.parcels));
+    } catch (e) {
+      const msg = getApiErrorMessage(e);
+      setError(msg);
+      setData(null);
+      setSelectedId(null);
+      message.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [api.agri, message]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const parcelRows = useMemo(() => (data ? parcelsToRows(data.parcels) : []), [data]);
+
   const selectedParcel = parcelRows.find((r) => r.id === selectedId);
-  const series: NdviPoint[] = selectedId ? (demo.timeseries[selectedId] ?? []) : [];
+  const series: NdviPoint[] = selectedId && data ? (data.timeseries[selectedId] ?? []) : [];
 
   const onSelectParcel = useCallback((id: string) => setSelectedId(id), []);
 
@@ -69,7 +108,12 @@ export function AgriRemoteSensingPage() {
       setDrawMode(false);
       setLastDrawn(feature);
       const ring = feature.geometry.coordinates[0] ?? [];
-      const n = ring.length > 1 && ring[0]![0] === ring[ring.length - 1]![0] && ring[0]![1] === ring[ring.length - 1]![1] ? ring.length - 1 : ring.length;
+      const n =
+        ring.length > 1 &&
+        ring[0]![0] === ring[ring.length - 1]![0] &&
+        ring[0]![1] === ring[ring.length - 1]![1]
+          ? ring.length - 1
+          : ring.length;
       message.success(`已圈定区域（${n} 个顶点），可在控制台或后续接口中使用 GeoJSON。`);
       if (import.meta.env.DEV) console.info('[agri-draw] polygon', feature);
     },
@@ -110,9 +154,22 @@ export function AgriRemoteSensingPage() {
       dataIndex: 'ndvi_latest',
       key: 'ndvi_latest',
       width: 88,
-      render: (v: number) => <Tag color={v >= 0.65 ? 'green' : v >= 0.45 ? 'gold' : 'red'}>{v.toFixed(2)}</Tag>,
+      render: (v: number) => (
+        <Tag color={v >= 0.65 ? 'green' : v >= 0.45 ? 'gold' : 'red'}>{v.toFixed(2)}</Tag>
+      ),
     },
   ];
+
+  const titleSuffix = data?.meta.demo === false ? '' : '（演示）';
+  const updatedLabel = data?.meta.updatedAt
+    ? (() => {
+        try {
+          return new Date(data.meta.updatedAt).toLocaleString();
+        } catch {
+          return data.meta.updatedAt;
+        }
+      })()
+    : null;
 
   return (
     <div className="space-y-4">
@@ -120,10 +177,14 @@ export function AgriRemoteSensingPage() {
         <div>
           <Typography.Title level={4} className="!mb-1 flex items-center gap-2">
             <GlobalOutlined className="text-emerald-600" />
-            农业遥感监测（演示）
+            农业遥感监测{titleSuffix}
           </Typography.Title>
           <Typography.Text type="secondary" className="text-sm">
-            {demo.meta.regionName} · 指数 {demo.meta.indexLabel}
+            {data
+              ? `${data.meta.regionName} · 指数 ${data.meta.indexLabel}`
+              : loading
+                ? '正在加载…'
+                : '—'}
           </Typography.Text>
         </div>
         <Space align="center" className="text-sm text-neutral-600">
@@ -136,6 +197,21 @@ export function AgriRemoteSensingPage() {
         </Space>
       </div>
 
+      {error ? (
+        <Alert
+          type="error"
+          showIcon
+          className="text-sm"
+          message="农业遥感数据加载失败"
+          description={error}
+          action={
+            <Button size="small" onClick={() => void load()}>
+              重试
+            </Button>
+          }
+        />
+      ) : null}
+
       {import.meta.env.DEV && !rasterConfig.titiler ? (
         <Alert
           type="info"
@@ -144,121 +220,131 @@ export function AgriRemoteSensingPage() {
           message="可选：未配置 TiTiler 指数栅格"
           description={
             <>
-              当前地图与地块演示可正常使用；未设置 COG / TileJSON 时不会请求 TiTiler，并非报错。
-              若要叠加动态栅格，请按{' '}
+              矢量地块与时序来自 <code className="rounded bg-neutral-100 px-1">GET /api/v1/agri/demo-bundle</code>
+              ；未设置 COG / TileJSON 时不会请求 TiTiler。配置说明见{' '}
               <Typography.Text code className="text-xs">
                 docs/agri-remote-sensing/前端对接指南.md
-              </Typography.Text>{' '}
-              配置 <code className="rounded bg-neutral-100 px-1">apps/web/.env.development</code> 中的{' '}
-              <code className="rounded bg-neutral-100 px-1">VITE_TITILER_BASE_URL</code> 与{' '}
-              <code className="rounded bg-neutral-100 px-1">VITE_AGRI_TITILER_COG_URL</code>（或完整 https 的{' '}
-              <code className="rounded bg-neutral-100 px-1">VITE_AGRI_TITILER_TILEJSON_PATH</code>
-              ）；路径为 <code className="rounded bg-neutral-100 px-1">/WebMercatorQuad/tilejson.json</code>，无{' '}
-              <code className="rounded bg-neutral-100 px-1">/cog</code> 前缀。修改后<strong>重启</strong>{' '}
-              <code className="rounded bg-neutral-100 px-1">pnpm dev</code>。MapLibre 补充见{' '}
+              </Typography.Text>
+              、
               <Typography.Text code className="text-xs">
                 TITILER_FRONTEND.md
-              </Typography.Text>。
+              </Typography.Text>
+              。
             </>
           }
         />
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(260px,320px)_1fr]">
-        <Card size="small" title="监测地块" className="shadow-sm">
-          <Table<ParcelRow>
-            size="small"
-            rowKey="id"
-            pagination={false}
-            columns={columns}
-            dataSource={parcelRows}
-            rowClassName={(r) => (r.id === selectedId ? 'bg-emerald-50' : '')}
-            onRow={(record) => ({
-              onClick: () => setSelectedId(record.id),
-              style: { cursor: 'pointer' },
-            })}
-          />
-        </Card>
+      <Spin spinning={loading && !data} tip="加载农业遥感数据…">
+        {data ? (
+          <div className="grid gap-4 xl:grid-cols-[minmax(260px,320px)_1fr]">
+            <Card size="small" title="监测地块" className="shadow-sm">
+              <Table<ParcelRow>
+                size="small"
+                rowKey="id"
+                pagination={false}
+                columns={columns}
+                dataSource={parcelRows}
+                rowClassName={(r) => (r.id === selectedId ? 'bg-emerald-50' : '')}
+                onRow={(record) => ({
+                  onClick: () => setSelectedId(record.id),
+                  style: { cursor: 'pointer' },
+                })}
+              />
+            </Card>
 
-        <Card
-          size="small"
-          title="地图"
-          className="shadow-sm"
-          extra={
-            <Space size="small" wrap>
-              {!drawMode ? (
-                <Button size="small" type="default" onClick={startDraw}>
-                  圈地
-                </Button>
-              ) : (
-                <>
-                  <Button size="small" type="primary" onClick={completeDraw}>
-                    完成圈地
-                  </Button>
-                  <Button size="small" onClick={cancelDraw}>
-                    取消
-                  </Button>
-                </>
-              )}
-            </Space>
-          }
-        >
-          <AgriMapView
-            ref={mapHandleRef}
-            boundary={boundary}
-            parcels={demo.parcels}
-            selectedParcelId={selectedId}
-            onSelectParcel={onSelectParcel}
-            rasterConfig={rasterConfig}
-            onTitilerError={rasterConfig.titiler ? onTitilerError : undefined}
-            drawMode={drawMode}
-            onDrawPolygon={onDrawPolygon}
-            onDrawCancel={onDrawCancel}
-          />
-          {lastDrawn ? (
-            <Typography.Paragraph type="secondary" className="mb-0 mt-2 text-xs">
-              最近一次圈地：已保存为 GeoJSON Polygon（{lastDrawn.geometry.coordinates[0]?.length ?? 0}{' '}
-              个坐标点，含闭合重复点）。
-            </Typography.Paragraph>
-          ) : null}
-          <div className="mt-3 border-t border-neutral-100 pt-3">
-            <Typography.Text type="secondary" className="mb-2 block text-xs">
-              NDVI 填色（地块均值 · 演示）
-            </Typography.Text>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-600">
-              <LegendStop color="#d73027" label="&lt;0.35" />
-              <LegendStop color="#fee08b" label="0.35–0.55" />
-              <LegendStop color="#91cf60" label="0.55–0.70" />
-              <LegendStop color="#1a9850" label="&gt;0.70" />
-            </div>
+            <Card
+              size="small"
+              title="地图"
+              className="shadow-sm"
+              extra={
+                <Space size="small" wrap>
+                  {!drawMode ? (
+                    <Button size="small" type="default" onClick={startDraw}>
+                      圈地
+                    </Button>
+                  ) : (
+                    <>
+                      <Button size="small" type="primary" onClick={completeDraw}>
+                        完成圈地
+                      </Button>
+                      <Button size="small" onClick={cancelDraw}>
+                        取消
+                      </Button>
+                    </>
+                  )}
+                </Space>
+              }
+            >
+              <AgriMapView
+                ref={mapHandleRef}
+                boundary={EMPTY_AGRI_BOUNDARY}
+                parcels={data.parcels}
+                selectedParcelId={selectedId}
+                onSelectParcel={onSelectParcel}
+                rasterConfig={rasterConfig}
+                onTitilerError={rasterConfig.titiler ? onTitilerError : undefined}
+                drawMode={drawMode}
+                onDrawPolygon={onDrawPolygon}
+                onDrawCancel={onDrawCancel}
+              />
+              {lastDrawn ? (
+                <Typography.Paragraph type="secondary" className="mb-0 mt-2 text-xs">
+                  最近一次圈地：已保存为 GeoJSON Polygon（{lastDrawn.geometry.coordinates[0]?.length ?? 0}{' '}
+                  个坐标点，含闭合重复点）。
+                </Typography.Paragraph>
+              ) : null}
+              <div className="mt-3 border-t border-neutral-100 pt-3">
+                <Typography.Text type="secondary" className="mb-2 block text-xs">
+                  NDVI 填色（地块均值）
+                </Typography.Text>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-600">
+                  <LegendStop color="#d73027" label="&lt;0.35" />
+                  <LegendStop color="#fee08b" label="0.35–0.55" />
+                  <LegendStop color="#91cf60" label="0.55–0.70" />
+                  <LegendStop color="#1a9850" label="&gt;0.70" />
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
-      </div>
+        ) : loading ? (
+          <div className="min-h-[200px]" aria-hidden />
+        ) : null}
+      </Spin>
 
-      <Card size="small" title="时序曲线" className="shadow-sm">
-        {selectedParcel && series.length > 0 ? (
-          <AgriTimeseriesChart
-            series={series}
-            parcelName={selectedParcel.name}
-            indexLabel={demo.meta.indexLabel}
-          />
-        ) : (
-          <Typography.Text type="secondary">请选择地块查看 NDVI 时序</Typography.Text>
-        )}
-      </Card>
+      {data ? (
+        <Card size="small" title="时序曲线" className="shadow-sm">
+          {selectedParcel && series.length > 0 ? (
+            <AgriTimeseriesChart
+              series={series}
+              parcelName={selectedParcel.name}
+              indexLabel={data.meta.indexLabel}
+            />
+          ) : (
+            <Typography.Text type="secondary">请选择地块查看 NDVI 时序</Typography.Text>
+          )}
+        </Card>
+      ) : null}
 
       <List
         size="small"
-        header={<span className="text-sm font-medium text-neutral-700">演示数据文件</span>}
+        header={<span className="text-sm font-medium text-neutral-700">数据来源</span>}
         bordered
         dataSource={[
-          { k: '行政区界', v: 'packages/data_mock/shenyang.json' },
-          { k: '地块与时序', v: 'packages/data_mock/agri-demo.json' },
+          {
+            k: '聚合接口',
+            v: 'GET /api/v1/agri/demo-bundle（需登录，Bearer Token）',
+          },
+          {
+            k: '说明',
+            v: 'docs/agri-remote-sensing/FRONTEND_API_AGRI.md',
+          },
+          ...(updatedLabel ? [{ k: '数据更新时间（服务端）', v: updatedLabel }] : []),
         ]}
         renderItem={(item) => (
           <List.Item className="!py-2">
             <Typography.Text className="text-sm">{item.k}</Typography.Text>
-            <Typography.Text code className="text-xs">
+            <Typography.Text code className="max-w-[min(100%,520px)] whitespace-normal break-all text-xs">
               {item.v}
             </Typography.Text>
           </List.Item>
