@@ -2,10 +2,21 @@
 export type JwtPayloadDisplay = {
   sub?: string;
   email?: string;
+  /** 常见：字符串数组，如 `user` / `admin` */
   roles?: string[];
+  /** 少数签发方使用单数 `role` */
+  role?: string;
   exp?: number;
   iat?: number;
 };
+
+/** 从 JWT payload 推断是否管理员（仅前端展示；以后端鉴权为准）。 */
+export function isAdminFromJwtPayload(p: JwtPayloadDisplay | null): boolean {
+  if (!p) return false;
+  if (Array.isArray(p.roles) && p.roles.includes('admin')) return true;
+  if (p.role === 'admin') return true;
+  return false;
+}
 
 export function decodeJwtPayloadDisplay(token: string): JwtPayloadDisplay | null {
   try {

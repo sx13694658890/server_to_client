@@ -49,6 +49,11 @@ export {
   createAgriApi,
   type AgriBundleMetaOut,
   type AgriDemoBundleOut,
+  type AgriDrawnParcelCreateBody,
+  type AgriDrawnParcelOut,
+  type AgriParcelFeatureOut,
+  type AgriParcelTimeseriesOut,
   type AgriParcelsGeoJson,
+  type AgriRegionSummaryOut,
   type AgriTimeseriesPointOut,
 } from './apis/agri.api';

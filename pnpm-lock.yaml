@@ -38,9 +38,6 @@ importers:
       '@repo/api':
         specifier: workspace:*
         version: link:../../packages/api
-      '@repo/data-mock':
-        specifier: workspace:*
-        version: link:../../packages/data_mock
       '@repo/hooks':
         specifier: workspace:*
         version: link:../../packages/hooks
@@ -53,6 +50,9 @@ importers:
       antd:
         specifier: ^5.22.7
         version: 5.29.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      dayjs:
+        specifier: ^1.11.13
+        version: 1.11.20
       echarts:
         specifier: ^6.0.0
         version: 6.0.0

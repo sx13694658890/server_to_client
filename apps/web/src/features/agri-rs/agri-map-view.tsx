@@ -46,6 +46,27 @@ function boundsFromFeatureCollection(fc: FeatureCollection): LngLatBounds | null
   return b;
 }
 
+function fitMapToParcels(map: maplibregl.Map, parcelsFc: FeatureCollection, durationMs = 0) {
+  const parcelExtent = boundsFromFeatureCollection(parcelsFc);
+  if (!parcelExtent) return;
+  const { minLng, minLat, maxLng, maxLat } = parcelExtent;
+  const w = maxLng - minLng;
+  const h = maxLat - minLat;
+  const padLng = w < 1e-6 ? 0.02 : w * 0.06;
+  const padLat = h < 1e-6 ? 0.02 : h * 0.06;
+  try {
+    map.fitBounds(
+      [
+        [minLng - padLng, minLat - padLat],
+        [maxLng + padLng, maxLat + padLat],
+      ],
+      { padding: 32, duration: durationMs, maxZoom: 12 }
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 function polygonRingCentroid(ring: number[][]): [number, number] {
   let sumLng = 0;
   let sumLat = 0;
@@ -123,11 +144,15 @@ export type AgriMapViewHandle = {
   completeDraw: () => boolean;
   /** 清空当前圈地草稿 */
   cancelDraw: () => void;
+  /** 按当前 parcels（含合并后的圈地）范围重新 fit */
+  fitToDataExtent: () => void;
 };
 
 type Props = {
   boundary: FeatureCollection;
   parcels: FeatureCollection;
+  /** 地块填色用的 `properties` 字段，如 `ndvi_latest` / `evi_latest` / `ndwi_latest` */
+  parcelIndexLatestField?: string;
   selectedParcelId: string | null;
   onSelectParcel: (id: string) => void;
   /** 高程/影像 XYZ；未配置时仅保留演示矢量底图 + 地块 */
@@ -163,6 +188,7 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
   {
     boundary,
     parcels,
+    parcelIndexLatestField = 'ndvi_latest',
     selectedParcelId,
     onSelectParcel,
     rasterConfig = null,
@@ -175,6 +201,8 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const parcelsFitRef = useRef(parcels);
+  parcelsFitRef.current = parcels;
   const onSelectRef = useRef(onSelectParcel);
   const selectedRef = useRef(selectedParcelId);
   const drawModeRef = useRef(drawMode);
@@ -192,6 +220,11 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
   useImperativeHandle(forwardedRef, () => ({
     completeDraw: () => drawControlRef.current?.complete() ?? false,
     cancelDraw: () => drawControlRef.current?.cancel(),
+    fitToDataExtent: () => {
+      const map = mapRef.current;
+      if (!map?.isStyleLoaded()) return;
+      fitMapToParcels(map, parcelsFitRef.current, 420);
+    },
   }));
 
   useEffect(() => {
@@ -307,7 +340,7 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
           'fill-color': [
             'interpolate',
             ['linear'],
-            ['get', 'ndvi_latest'],
+            ['coalesce', ['to-number', ['get', parcelIndexLatestField]], 0.45],
             0.25,
             '#d73027',
             0.45,
@@ -317,7 +350,12 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
             0.85,
             '#1a9850',
           ],
-          'fill-opacity': 0.55,
+          'fill-opacity': [
+            'case',
+            ['==', ['get', 'source'], 'drawn'],
+            0.38,
+            0.55,
+          ],
         },
       });
       map.addLayer({
@@ -326,6 +364,18 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
         source: 'parcels',
         paint: { 'line-color': '#1f2937', 'line-width': 1 },
       });
+      map.addLayer({
+        id: 'parcels-line-drawn',
+        type: 'line',
+        source: 'parcels',
+        filter: ['==', ['get', 'source'], 'drawn'],
+        paint: {
+          'line-color': '#4338ca',
+          'line-width': 2,
+          'line-dasharray': [2, 1.5],
+        },
+      });
+
       map.addLayer({
         id: 'parcels-selected',
         type: 'line',
@@ -517,25 +567,7 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
 
       applySelection(selectedRef.current);
 
-      const parcelExtent = boundsFromFeatureCollection(parcels);
-      if (parcelExtent) {
-        const { minLng, minLat, maxLng, maxLat } = parcelExtent;
-        const w = maxLng - minLng;
-        const h = maxLat - minLat;
-        const padLng = w < 1e-6 ? 0.02 : w * 0.06;
-        const padLat = h < 1e-6 ? 0.02 : h * 0.06;
-        try {
-          map.fitBounds(
-            [
-              [minLng - padLng, minLat - padLat],
-              [maxLng + padLng, maxLat + padLat],
-            ],
-            { padding: 32, duration: 0, maxZoom: 12 }
-          );
-        } catch {
-          /* ignore */
-        }
-      }
+      fitMapToParcels(map, parcels, 0);
 
       if (titilerCfg) {
         const tileJsonUrl = resolveStandaloneTitilerTileJsonUrl({
@@ -600,9 +632,10 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
 
           if (map.getLayer('district-name-labels')) map.moveLayer('district-name-labels');
           if (map.getLayer('parcel-name-labels')) map.moveLayer('parcel-name-labels');
-          for (const lid of ['draw-draft-fill', 'draw-draft-line', 'draw-draft-verts'] as const) {
+          for (const lid of ['parcels-line-drawn', 'draw-draft-fill', 'draw-draft-line', 'draw-draft-verts'] as const) {
             if (map.getLayer(lid)) map.moveLayer(lid);
           }
+          if (map.getLayer('parcels-selected')) map.moveLayer('parcels-selected');
         };
 
         if (tileJsonUrl) {
@@ -640,7 +673,7 @@ export const AgriMapView = forwardRef<AgriMapViewHandle, Props>(function AgriMap
       map.remove();
       mapRef.current = null;
     };
-  }, [boundary, parcels, rasterConfig, onTitilerError]);
+  }, [boundary, parcels, parcelIndexLatestField, rasterConfig, onTitilerError]);
 
   useEffect(() => {
     if (!drawMode) {

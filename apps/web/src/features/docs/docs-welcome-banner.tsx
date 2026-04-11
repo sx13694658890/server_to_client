@@ -16,6 +16,9 @@ export function DocsWelcomeBanner() {
         </Typography.Title>
         <Typography.Paragraph type="secondary" className="!mb-0 text-sm leading-relaxed">
           在左侧选择业务分类，快速定位常用说明；支持关键词搜索与预览。若暂无访问权限，请联系管理员开通。
+          <span className="mt-1 block text-neutral-500">
+            管理员账号可在本页上方使用「上传文档」入库 .md / .docx（见接口 POST /api/v1/docs/upload）。
+          </span>
         </Typography.Paragraph>
       </div>
     </div>
