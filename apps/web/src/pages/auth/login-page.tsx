@@ -1,9 +1,10 @@
 import { App, Button, Card, Form, Input, Typography } from 'antd';
 import { getApiErrorMessage } from '@repo/api';
 import { useAuth } from '@repo/hooks';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useDocumentTitle } from 'usehooks-ts';
+import { consumePasswordChangedReloginFlag } from '../../auth/password-changed-session';
 import { useWebApi } from '../../hooks/use-web-api';
 import { zodErrorToFormFieldData } from '../../lib/zod-antd';
 import {
@@ -21,6 +22,16 @@ export function LoginPage() {
   const api = useWebApi();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (accessToken) return;
+    if (!consumePasswordChangedReloginFlag()) return;
+    message.warning({
+      content:
+        '您的密码已在其他设备或浏览器标签中修改。当前登录已失效，请使用新密码重新登录。',
+      duration: 8,
+    });
+  }, [accessToken, message]);
 
   if (accessToken) {
     return <Navigate to="/dashboard/home" replace />;

@@ -1,8 +1,11 @@
 import { BellOutlined, MoreOutlined } from '@ant-design/icons';
 import { Badge, Button, Dropdown, Popover, Typography } from 'antd';
 import type { MessageItem } from '@repo/api';
+import { useAuth } from '@repo/hooks';
 import { useNavigate } from 'react-router-dom';
+import { markPasswordChangedRelogin } from '../../auth/password-changed-session';
 import { useMessageInboxContext } from './message-inbox-context';
+import { isPasswordChangedMessage } from './is-password-changed-message';
 import {
   MessageInboxFooterLink,
   MessageInboxList,
@@ -11,6 +14,7 @@ import {
 
 export function DashboardMessageBell() {
   const navigate = useNavigate();
+  const { clearAuth } = useAuth();
   const {
     unreadCount,
     popoverOpen,
@@ -27,18 +31,13 @@ export function DashboardMessageBell() {
   } = useMessageInboxContext();
 
   const onItemActivate = async (item: MessageItem) => {
-    await onMarkRead(item);
-    const payload = item.payload;
-    if (
-      payload &&
-      typeof payload === 'object' &&
-      !Array.isArray(payload) &&
-      'kind' in payload &&
-      payload.kind === 'password_changed'
-    ) {
-      navigate('/dashboard/account');
+    if (isPasswordChangedMessage(item)) {
+      markPasswordChangedRelogin();
+      clearAuth();
       setPopoverOpen(false);
+      return;
     }
+    await onMarkRead(item);
   };
 
   const panel = (

@@ -1,10 +1,13 @@
 import { getApiErrorMessage, readMessagesStream, type MessageItem } from '@repo/api';
+import { useAuth } from '@repo/hooks';
 import { App } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { markPasswordChangedRelogin } from '../../auth/password-changed-session';
 import { useWebApi } from '../../hooks/use-web-api';
+import { isPasswordChangedMessage } from './is-password-changed-message';
 
 const PAGE_SIZE = 20;
-const POLL_MS = 45_000;
+/** 短时间内合并重复的未读数 HTTP（如 SSE 与列表同时触发） */
 const UNREAD_DEDUPE_MS = 2000;
 
 let unreadCountCache: number | null = null;
@@ -21,6 +24,7 @@ export type UseMessagesInboxOptions = {
 export function useMessagesInbox(options: UseMessagesInboxOptions) {
   const { listEnabled } = options;
   const { message } = App.useApp();
+  const { accessToken, clearAuth } = useAuth();
   const api = useWebApi();
 
   const [unreadCount, setUnreadCount] = useState(0);
@@ -37,8 +41,6 @@ export function useMessagesInbox(options: UseMessagesInboxOptions) {
 
   const activeTabRef = useRef<MessageInboxTab>(activeTab);
   activeTabRef.current = activeTab;
-
-  const unreadPollingRef = useRef(false);
 
   const displayItems = useMemo(() => {
     if (activeTab === 'unread') return items;
@@ -120,20 +122,11 @@ export function useMessagesInbox(options: UseMessagesInboxOptions) {
     [message]
   );
 
+  /** 首屏拉一次未读数；之后依赖 GET /messages/stream（Redis 广播）推送 `unread_count` / `notification`，见 docs/message通知/前端实现方案.md §5.2 */
   useEffect(() => {
+    if (!accessToken) return;
     void refreshUnread();
-  }, [refreshUnread]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (unreadPollingRef.current) return;
-      unreadPollingRef.current = true;
-      void refreshUnread().finally(() => {
-        unreadPollingRef.current = false;
-      });
-    }, POLL_MS);
-    return () => window.clearInterval(id);
-  }, [refreshUnread]);
+  }, [accessToken, refreshUnread]);
 
   useEffect(() => {
     if (!listEnabled) return;
@@ -141,6 +134,8 @@ export function useMessagesInbox(options: UseMessagesInboxOptions) {
   }, [listEnabled, activeTab, loadList]);
 
   useEffect(() => {
+    if (!accessToken) return;
+
     const stop = { current: false };
     let abort: AbortController | null = null;
     let bootTimer: number | null = null;
@@ -156,8 +151,15 @@ export function useMessagesInbox(options: UseMessagesInboxOptions) {
           fetchWithAuth: apiRef.current.fetchWithAuth,
         };
         try {
+          if (attempt > 0) void refreshUnread();
           await readMessagesStream(bundle, abort.signal, {
             onNotification: (item) => {
+              if (isPasswordChangedMessage(item)) {
+                mergeItem(item);
+                markPasswordChangedRelogin();
+                clearAuth();
+                return;
+              }
               mergeItem(item);
               void refreshUnread();
             },
@@ -185,7 +187,7 @@ export function useMessagesInbox(options: UseMessagesInboxOptions) {
       if (bootTimer != null) window.clearTimeout(bootTimer);
       abort?.abort();
     };
-  }, [mergeItem, refreshUnread]);
+  }, [accessToken, clearAuth, mergeItem, refreshUnread]);
 
   const setTab = useCallback((tab: MessageInboxTab) => {
     setActiveTab(tab);

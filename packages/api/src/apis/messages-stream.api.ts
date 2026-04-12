@@ -26,7 +26,8 @@ function dispatchEvent(ev: MessageSseEvent, handlers: MessageStreamHandlers) {
 }
 
 /**
- * GET /messages/stream（SSE + Bearer），按 docs/FRONTEND_API.md §6 解析。
+ * GET /messages/stream（SSE + Bearer，与 AI 流式相同用 fetch + ReadableStream）。
+ * 事件类型见 `messageSseEventSchema`；产品说明见 docs/message通知/前端实现方案.md §2.4、§5。
  */
 export async function readMessagesStream(
   bundle: HttpBundle,

@@ -1,14 +1,16 @@
 import { Card, Typography } from 'antd';
 import type { MessageItem } from '@repo/api';
+import { useAuth } from '@repo/hooks';
 import { useDocumentTitle } from 'usehooks-ts';
-import { useNavigate } from 'react-router-dom';
+import { markPasswordChangedRelogin } from '../../auth/password-changed-session';
 import { useMessageInboxContext } from '../../features/messages/message-inbox-context';
+import { isPasswordChangedMessage } from '../../features/messages/is-password-changed-message';
 import { MessageInboxList, MessageInboxTabs } from '../../features/messages/message-inbox-ui';
 
 export function MessagesCenterPage() {
   useDocumentTitle('通知中心 · client-react-sp');
 
-  const navigate = useNavigate();
+  const { clearAuth } = useAuth();
   const {
     activeTab,
     setTab,
@@ -21,17 +23,12 @@ export function MessagesCenterPage() {
   } = useMessageInboxContext();
 
   const onItemActivate = async (item: MessageItem) => {
-    await onMarkRead(item);
-    const payload = item.payload;
-    if (
-      payload &&
-      typeof payload === 'object' &&
-      !Array.isArray(payload) &&
-      'kind' in payload &&
-      payload.kind === 'password_changed'
-    ) {
-      navigate('/dashboard/account');
+    if (isPasswordChangedMessage(item)) {
+      markPasswordChangedRelogin();
+      clearAuth();
+      return;
     }
+    await onMarkRead(item);
   };
 
   return (
